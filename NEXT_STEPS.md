@@ -49,7 +49,7 @@ dark-slate + green look):
   the daily scorecard now fits all 18 holes without scrolling.
 - **All-rounds tournament putting stats** — "feet of putts made" per round + a
   tournament total (ShotLink stat: the length of every putt holed; a 2-putt
-  contributes the tap-in, not the lag), and the **10 shortest missed putts across
+  contributes the tap-in, not the lag), and the **5 shortest missed putts across
   the tournament** (round-tagged). Server returns each round's top-10 misses +
   `madePuttFeet`; the client aggregates.
 

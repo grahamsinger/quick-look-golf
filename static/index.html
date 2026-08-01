@@ -809,7 +809,7 @@
       const madeStrip = `<div class="madestrip"><span class="ms-lbl">Feet of putts made</span>${played.map((r, i) => `<span class="ms-item">R${r} <b>${madeByRound[i] != null ? madeByRound[i] : '–'} ft</b></span>`).join('')}<span class="ms-item ms-total">Tournament <b>${madeTotal} ft</b></span></div>`;
       const allMissed = played.flatMap(r => (byRound[r].shortestMissed || []).map(m => ({ ...m, round: r })));
       allMissed.sort((a, b) => a.lengthFt - b.lengthFt || a.hole - b.hole);
-      const missPanel = shortestMissedPanel(allMissed.slice(0, 10), { title: '10 shortest putts missed', sub: '— across the tournament', showRound: true });
+      const missPanel = shortestMissedPanel(allMissed.slice(0, 5), { title: '5 shortest putts missed', sub: '— across the tournament', showRound: true });
       $('out').innerHTML =
         `<div class="summary"><span class="who">${playerName()}</span><span class="meta">All rounds · first-putt length (ft)</span></div>
          ${madeStrip}
