@@ -90,3 +90,20 @@ approach play with chipping:
   stroke index + 1 vs par) instead of the hole's final score, which moved to
   the tooltip.
 - Published: https://github.com/grahamsinger/quick-look-golf
+
+## Aug 2026 — Course view (spatial shot viz)
+
+The round drawn over the tournament's real aerial — the feature the removed
+"shot trails" always wanted to be:
+
+- Reverse-engineered the exact TOURCAST projection (verified ~1 m: pins land
+  on greens): shot `tourcastX/Y` are **feet**; `world_m = 0.3048 × tourcast −
+  offsetConfig` (from `orchestrator-config.pgatour.com/tourcast/pga-tour/{tid}`),
+  then the `course.tfw` world-file affine maps meters → the 2048² aerial.
+- New `/api/coursemap` bundles tfw + offset + `courseData.json` pin/tee
+  positions (Redis-cached, static per tournament); the aerial hotlinks in an
+  `<img>` with an SVG overlay on top.
+- New **Course** tab: 18 trails tee → hole, shot dots with tooltips,
+  score-colored hole chips, hover-a-hole isolation. Per-round (like Shots).
+  Events without TOURCAST assets (small opposite-field ones) fall back to a
+  friendly message.

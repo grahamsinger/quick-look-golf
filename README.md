@@ -53,9 +53,13 @@ default. Self-hosted Fraunces display serif.
     short comeback 2nd/3rd putt ranks correctly).
   - *All rounds* — a **front/back matrix** (nines side by side): each cell shows
     proximity (big) over the had-distance (small), colored by score.
-- **Shots** view: per-hole shot-by-shot play-by-play with distances and TrackMan
-  numbers (ball/club speed, launch, spin, apex). *(No shot-trail plot — a spatial
-  view would need the real hole image; see `NEXT_STEPS.md`.)*
+- **Shots** view: a per-hole comparison matrix — rows = holes in play order,
+  columns = shot number (ball speed on full swings, color-coded results).
+- **Course** view: **every shot of the round drawn over the tournament's real
+  aerial** (TOURCAST's georeferenced imagery; shots projected to ~1 m). Trails
+  run tee → hole, hover a hole to isolate it, hole chips are score-colored.
+  Available for ShotLink-enhanced events (most of the schedule); smaller
+  opposite-field events don't publish the imagery and fall back gracefully.
 - **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=`), so a
   reload restores the view and a **copy-link** button shares it. A freshness bar
   shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp

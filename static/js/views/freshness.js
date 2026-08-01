@@ -23,7 +23,7 @@ function freshTs() {
     const ts = Object.values(state.puttsAllTs || {}).filter(Boolean);
     return ts.length ? Math.min(...ts) : null;
   }
-  return state.view === 'shots' ? state.shotsTs : state.puttsTs;
+  return (state.view === 'shots' || state.view === 'course') ? state.shotsTs : state.puttsTs;
 }
 
 export function updateFreshBar() {

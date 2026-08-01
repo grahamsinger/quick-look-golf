@@ -326,6 +326,26 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .pill.bogey { background: var(--tint-warn-2); color: var(--warn); }
 .pill.double { background: var(--tint-bad-2); color: var(--bad); }
 
+/* ---------- course overview (aerial + shot trails) ---------- */
+/* colors here are fixed (they sit on the aerial photo, same in both themes) */
+.card.coursemap { padding: 10px; }
+.cmwrap { position: relative; width: min(980px, 100%); }
+.cmwrap img { width: 100%; display: block; border-radius: 8px; user-select: none; }
+.cmwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.chole polyline { fill: none; stroke: rgba(252,249,240,.95); stroke-width: 4;
+  stroke-linejoin: round; stroke-linecap: round;
+  filter: drop-shadow(0 0 2.5px rgba(0,0,0,.85)); }
+.chole .cpt { fill: #F6C443; stroke: rgba(20,20,20,.6); stroke-width: 1.5; }
+.chole .cpin circle { fill: #163A2B; stroke: rgba(252,249,240,.92); stroke-width: 2.5; }
+.chole .cpin text { fill: #F4EFE2; font: 700 17px var(--sans); text-anchor: middle; }
+.chole .cpin.lb-good circle { fill: #1E6B3F; }
+.chole .cpin.lb-over circle { fill: #A5301F; }
+/* hover a hole: isolate it, dim the rest (only when a hole is truly hovered) */
+.cmwrap svg:has(.chole:hover) .chole:not(:hover) { opacity: .38; }
+.chole polyline { pointer-events: stroke; }
+.chole:hover polyline { stroke: #FFD34D; stroke-width: 6; }
+.chole:hover .cpt { r: 8; }
+
 /* matrix */
 .mxkey { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; color: var(--ink-3); font-size: 12px; margin: 14px 2px 14px; }
 .mxkey .kgrp { display: inline-flex; align-items: center; gap: 8px; }

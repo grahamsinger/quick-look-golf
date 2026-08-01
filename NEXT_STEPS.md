@@ -17,36 +17,19 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   feel too generous or stingy over time.
 
 ## Possible improvements
-- **Spatial shot viz — SOLVED, ready to build (Aug 2026).** The exact
-  shot-to-aerial projection is verified to ~1 m (pins land dead-center on
-  greens for R2026524). A new "Course" tab is the plan. The full recipe:
-  - **Assets (tourcast.pgatour.com, static, no auth), per tournament:**
-    `models/{tid}/3D_Assets/terrain/course.jpg` (2048² whole-course aerial),
-    `terrain/course.tfw` (world file), `terrain/extents.txt`, and — better for
-    per-hole views — **per-hole** `terrain/terrain{NN}.jpg` + `terrain{NN}.tfw`
-    + `terrain/cutouts/{hole}.png` (NN = zero-padded hole). Also
-    `data/courseData.json`: `pinsTees` (per hole `[pinX, pinY, teeX, teeY]`,
-    world meters) and `holeCenterLines` — enough to compute per-hole crop
-    boxes and orientation.
-  - **The transform** (extracted from the TOURCAST app + its config API):
-    1. `world_m = 0.3048 × tourcast − (offset.x, offset.y)` (tourcast coords
-       are in feet; rotate by `offset.rotate`, 0 for this course), where the
-       offset comes from
-       `https://orchestrator-config.pgatour.com/tourcast/pga-tour/{tid}` →
-       `offsetConfig` (R2026524: x=3249.955441, y=3050.01224).
-    2. `world → pixels` via the tfw (standard world-file affine):
-       `px = (worldX − C)/A`, `py = (F − worldY)/|E|` with A=E=0.0185831 m/px,
-       (C, F) = top-left; scale full-res (69956×91481) → the 2048² jpg.
-    3. Strokes' `overview.leftToRightCoords.{from,to}Coords.tourcastX/Y` are
-       already in our cached payloads. (`enhancedX/Y` is a normalized 0–1
-       per-hole-pickle space — ignore; plain `x/y` are redacted −1.)
-  - Serve config/tfw/courseData through our server (proxy + Redis cache,
-    they're static per tournament); the jpg can hotlink in an `<img>` (SVG
-    overlay on top — no canvas pixel access, so CORS is a non-issue).
-  - Dead ends, verified: `holeDetails` Cloudinary "pickle" URLs **404**,
-    `ImageAsset` imgix guesses **410**; `holeImage` (a *photo*) resolves.
-    `holeDetails.statsSummary` (birdie% etc. + rank) could power a
-    hole-difficulty strip.
+- **Course view v2 ideas** (v1 shipped — see CHANGELOG; projection recipe
+  documented there and in `static/js/views/course.js` / `/api/coursemap`):
+  - **Per-hole zoom** — click a hole chip to crop to that hole. The assets
+    exist: per-hole `terrain/terrain{NN}.jpg` + `terrain{NN}.tfw` +
+    `terrain/cutouts/{hole}.png` on the same host, and `courseData.json`'s
+    `holeCenterLines` give crop boxes/orientation.
+  - **Multi-round overlay** — same hole, all 4 rounds' trails (tee-shot
+    dispersion at a glance).
+  - Shot dots could encode result quality (colors from the shots matrix).
+  - Multi-course events (e.g. AmEx) may need per-courseId `courseOffset`
+    from the config (the app supports a `courseOffset` array).
+  - `holeDetails.statsSummary` (birdie% + rank) could power a hole-difficulty
+    strip on the aerial.
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*
   shows the chip distance (in feet), because "the shot that set up the putt" is
   the chip. Optional: separately surface the *approach into the green* distance.

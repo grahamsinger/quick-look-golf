@@ -28,7 +28,9 @@ from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .client import PGATourClient
+import httpx
+
+from .client import PGATourClient, _USER_AGENT
 
 # Cache-key namespace. Bump CACHE_VERSION to invalidate everything after a
 # change to the derived data shape (completed rounds are stored with no expiry).
@@ -396,6 +398,63 @@ def putts(
         "shortestMissed": missed_putts[:10],
         "madePuttFeet": round(made_putt_feet, 1),
     }
+
+
+# --- course map (spatial shot viz) -----------------------------------------
+# TOURCAST's static asset host has a georeferenced aerial per tournament, and
+# its config API has the offset that maps shot coords (tourcast feet) onto it:
+#   world_m = 0.3048 * tourcast - (offset.x, offset.y)   (rotate: see config)
+#   pixels  = world-file (tfw) affine, full-res scaled to the 2048px jpg
+# Verified ~1 m (pins land on greens). Assets are static per tournament, so we
+# cache the bundle in Redis with no expiry.
+_assets_http = httpx.Client(timeout=10.0, headers={"user-agent": _USER_AGENT})
+_TOURCAST_MODELS = "https://tourcast.pgatour.com/models"
+_TOURCAST_CONFIG = "https://orchestrator-config.pgatour.com/tourcast/pga-tour"
+
+
+@app.get("/api/coursemap")
+def coursemap(response: Response, tournamentId: str, refresh: bool = False) -> dict:
+    """Everything the Course view needs to project shots onto the aerial."""
+    key = f"golf:{CACHE_VERSION}:coursemap:{tournamentId}"
+    if refresh:
+        _cache_del(key)
+    else:
+        cached = _cache_get(key)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            return json.loads(cached)
+    base = f"{_TOURCAST_MODELS}/{tournamentId}/3D_Assets"
+    try:
+        tfw_r = _assets_http.get(f"{base}/terrain/course.tfw")
+        cfg_r = _assets_http.get(f"{_TOURCAST_CONFIG}/{tournamentId}")
+        if tfw_r.status_code != 200 or cfg_r.status_code != 200:
+            return {"available": False}
+        tfw = [float(x) for x in tfw_r.text.split()]
+        offset = cfg_r.json().get("offsetConfig") or {}
+        course_data = {}
+        cd_r = _assets_http.get(f"{base}/data/courseData.json")
+        if cd_r.status_code == 200:
+            course_data = cd_r.json()
+    except (httpx.HTTPError, ValueError):
+        return {"available": False}
+    if len(tfw) < 8 or not offset:
+        return {"available": False}
+    out = {
+        "available": True,
+        "imageUrl": f"{base}/terrain/course.jpg",
+        # world-file affine: [pxSizeX, rot, rot, pxSizeY(neg), topLeftX, topLeftY]
+        # + the full-res raster size the tfw refers to (the jpg is 2048x2048)
+        "tfw": {"a": tfw[0], "e": tfw[3], "c": tfw[4], "f": tfw[5],
+                "fullW": tfw[6], "fullH": tfw[7]},
+        "offset": {"x": offset.get("x", 0), "y": offset.get("y", 0),
+                   "rotate": offset.get("rotate", 0)},
+        # per-hole [pinX, pinY, teeX, teeY] in world meters (for labels/crops)
+        "pinsTees": (course_data.get("pinsTees") or [[]])[0],
+        "holeCenterLines": course_data.get("holeCenterLines") or [],
+    }
+    _cache_set(key, json.dumps(out))
+    response.headers["X-Cache"] = "MISS"
+    return out
 
 
 @app.get("/graphiql", response_class=HTMLResponse)

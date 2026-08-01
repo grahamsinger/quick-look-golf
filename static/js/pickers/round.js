@@ -33,7 +33,7 @@ export function updateRoundOptions() {
   const sel = $('round');
   const cur = sel.value;
   const mx = maxRound();
-  const allowAll = state.view !== 'shots';
+  const allowAll = state.view !== 'shots' && state.view !== 'course';  // both are per-round views
   let html = '';
   for (let r = 1; r <= mx; r++) html += `<option value="${r}">Round ${r}</option>`;
   if (allowAll) html += '<option value="all">All rounds</option>';
