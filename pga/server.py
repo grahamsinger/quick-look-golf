@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +31,7 @@ from .client import PGATourClient
 
 # Cache-key namespace. Bump CACHE_VERSION to invalidate everything after a
 # change to the derived data shape (completed rounds are stored with no expiry).
-CACHE_VERSION = "v1"
+CACHE_VERSION = "v2"  # v2: cache wraps the payload as {fetchedAt, data}
 
 _SCORE_NAMES = {
     -4: "Condor", -3: "Albatross", -2: "Eagle", -1: "Birdie",
@@ -123,11 +124,14 @@ def _round_final(data: dict) -> bool:
 
 def shot_details_cached(
     tournament_id: str, player_id: str, round_num: int, refresh: bool = False
-) -> tuple[dict, bool]:
+) -> tuple[dict, bool, int]:
     """Radar-on shotDetailsV3 for one player/round, cached in Redis when final.
 
-    Returns (data, cache_hit). refresh=True busts the cached entry and re-fetches
-    (for the rare ShotLink correction to an already-completed round).
+    Returns (data, cache_hit, fetched_at_ms), where fetched_at_ms is when the
+    payload was actually captured from PGA — stored alongside a cached final
+    round, or "now" for a fresh/live fetch. This is what the UI's "data current
+    as of" should reflect, not the browser's fetch time. refresh=True busts the
+    cached entry and re-fetches (for the rare ShotLink correction to a round).
     """
     key = f"golf:{CACHE_VERSION}:shotdetails:{tournament_id}:{player_id}:{round_num}"
     if refresh:
@@ -135,11 +139,13 @@ def shot_details_cached(
     else:
         cached = _cache_get(key)
         if cached is not None:
-            return json.loads(cached), True
+            obj = json.loads(cached)
+            return obj["data"], True, obj.get("fetchedAt")
     data = client.shot_details(tournament_id, player_id, round_num, include_radar=True)
+    fetched_at = int(time.time() * 1000)
     if _round_final(data):
-        _cache_set(key, json.dumps(data))
-    return data, False
+        _cache_set(key, json.dumps({"fetchedAt": fetched_at, "data": data}))
+    return data, False, fetched_at
 
 
 @app.post("/api/graphql")
@@ -232,8 +238,10 @@ def shots(
     refresh: bool = False,
 ) -> dict:
     """Shot-by-shot data: {holes: [{holeNumber, par, strokes: [...]}]}."""
-    data, hit = shot_details_cached(tournamentId, playerId, round, refresh=refresh)
+    data, hit, fetched_at = shot_details_cached(tournamentId, playerId, round, refresh=refresh)
     response.headers["X-Cache"] = "HIT" if hit else "MISS"
+    if fetched_at is not None:
+        response.headers["X-Data-Fetched-At"] = str(fetched_at)
     return data
 
 
@@ -252,9 +260,12 @@ def putts(
     stroke that put the ball on the green). Holes finished from off the green
     have no putt.
     """
-    data, hit = shot_details_cached(tournamentId, playerId, round_num, refresh=refresh)
+    data, hit, fetched_at = shot_details_cached(tournamentId, playerId, round_num, refresh=refresh)
     response.headers["X-Cache"] = "HIT" if hit else "MISS"
+    if fetched_at is not None:
+        response.headers["X-Data-Fetched-At"] = str(fetched_at)
     rows = []
+    missed_putts = []  # every putt that didn't hole out, for "shortest missed"
     for h in data["holes"]:
         strokes = h["strokes"]
 
@@ -280,6 +291,29 @@ def putts(
                 approach_had = f"{h['yardage']} yds"
 
         diff, result = _score_result(h.get("score"), h["par"])
+        # Every putt except the one that holed out is a "miss". Its length is the
+        # distance to the hole going into it = the previous stroke's remaining
+        # (the approach for the 1st putt, the prior putt for later ones). Ranking
+        # these by length surfaces the painful short misses, and because each
+        # putt is measured on its own, a short 2nd/3rd putt sorts correctly even
+        # when it's shorter than the first putt on that hole.
+        green_idxs = [i for i, s in enumerate(strokes) if on_green(s)]
+        for putt_no, gi in enumerate(green_idxs[:-1], start=1):
+            if gi == 0:
+                continue
+            length_ft = _parse_feet(strokes[gi - 1].get("distanceRemaining"))
+            if length_ft is None:
+                continue
+            missed_putts.append(
+                {
+                    "hole": h["holeNumber"],
+                    "par": h["par"],
+                    "lengthFt": length_ft,
+                    "puttNumber": putt_no,
+                    "result": result,
+                    "scoreToPar": diff,
+                }
+            )
         rows.append(
             {
                 "hole": h["holeNumber"],
@@ -304,7 +338,14 @@ def putts(
         "avgFirstPuttFt": round(sum(fps) / len(fps), 1) if fps else None,
         "holesHoledOffGreen": sum(1 for r in rows if r["holedOffGreen"]),
     }
-    return {"round": data["round"], "holes": rows, "summary": summary}
+    # shortest missed putts first (tie-break by hole for stable ordering)
+    missed_putts.sort(key=lambda m: (m["lengthFt"], m["hole"]))
+    return {
+        "round": data["round"],
+        "holes": rows,
+        "summary": summary,
+        "shortestMissed": missed_putts[:5],
+    }
 
 
 @app.get("/graphiql", response_class=HTMLResponse)

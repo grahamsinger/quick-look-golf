@@ -3,209 +3,389 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>golf_api — Shot Explorer</title>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <title>Fairway — PGA Shot Explorer</title>
+  <script>
+    // Set the theme before first paint so there's no flash of the wrong palette.
+    (function () {
+      try {
+        var t = localStorage.getItem('theme') ||
+          (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
   <style>
+    @font-face {
+      font-family: 'Fraunces';
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url('/fonts/fraunces-latin-var.woff2') format('woff2');
+    }
     :root {
-      --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a;
-      --fg: #e7ebf0; --muted: #8b93a1; --accent: #4ade80; --accent2: #38bdf8;
-      --putt: #38bdf8; --stroke: #fbbf24; --penalty: #f87171;
+      --serif: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+      --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+      /* surfaces — warm paper */
+      --paper: #F2ECDF; --paper-2: #EAE1D0; --card: #FBF8F1; --card-2: #F6F0E5;
+      --line: #E4DBC9; --line-2: #D3C8B2;
+      /* ink — deep pine neutrals */
+      --ink: #16342A; --ink-2: #4B5A50; --ink-3: #828B7E; --charcoal: #33382F;
+      /* brand + accents */
+      --pine: #1C4A34; --pine-2: #256B45; --fairway: #2F7D4F;
+      --sand: #B5862B; --sand-2: #CDA968;
+      --flag: #B23A2B; --flag-2: #C34C3B;
+      --flag-tint: #F4E2DB; --turf: #E7EDD9;
+      /* score-to-par text (WCAG-safe on paper) */
+      --good: #1E6B3F; --neutral: #4B5A50; --warn: #8A6414; --bad: #A5301F;
+      /* focus ring + status tint fills (tokenized so dark mode can override) */
+      --focus-ring: rgba(28,74,52,.16);
+      --tint-good: rgba(47,125,79,.09); --tint-good-2: rgba(47,125,79,.16);
+      --tint-bad: rgba(178,58,43,.09); --tint-bad-2: rgba(178,58,43,.15);
+      --tint-warn-2: rgba(181,134,43,.17);
+
+      --r-sm: 7px; --r: 10px; --r-lg: 14px;
+      --shadow-sm: 0 1px 2px rgba(22,52,42,.06);
+      --shadow: 0 1px 2px rgba(22,52,42,.05), 0 12px 28px -16px rgba(22,52,42,.22);
+    }
+    /* dark theme — a warm clubhouse-at-dusk palette (its own steps, CVD-validated) */
+    :root[data-theme="dark"] {
+      --paper: #12140E; --paper-2: #0D0F0A; --card: #1A1D15; --card-2: #21251A;
+      --line: #2C3126; --line-2: #3C4230;
+      --ink: #ECE7D6; --ink-2: #B4B4A0; --ink-3: #838A79; --charcoal: #6B7160;
+      --pine: #2F9257; --pine-2: #38A863; --fairway: #4FB477;
+      --sand: #D8B45E; --sand-2: #C6A468;
+      --flag: #E56C52; --flag-2: #EC8370; --flag-tint: #2C1C17; --turf: #1B2416;
+      --good: #46B873; --neutral: #B4B4A0; --warn: #F0CB4A; --bad: #EC6247;
+      --focus-ring: rgba(79,180,119,.26);
+      --tint-good: rgba(70,184,115,.15); --tint-good-2: rgba(70,184,115,.24);
+      --tint-bad: rgba(236,98,71,.15); --tint-bad-2: rgba(236,98,71,.24);
+      --tint-warn-2: rgba(240,203,74,.20);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
+      --shadow: 0 1px 2px rgba(0,0,0,.45), 0 14px 30px -16px rgba(0,0,0,.75);
     }
     * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
-      margin: 0; background: var(--bg); color: var(--fg);
-      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; background: var(--paper); color: var(--ink);
+      font: 14px/1.55 var(--sans);
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
     }
-    header {
-      display: flex; align-items: center; gap: 16px; padding: 14px 20px;
-      border-bottom: 1px solid var(--line); background: var(--panel);
-      position: sticky; top: 0; z-index: 5;
+    b, strong { font-weight: 640; }
+    .ic { width: 1em; height: 1em; flex: none; vertical-align: -0.14em; }
+
+    /* ---------- header ---------- */
+    .topbar {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 24px; background: var(--card);
+      border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20;
     }
-    header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
-    header .sub { color: var(--muted); font-size: 12px; }
-    header .spacer { flex: 1; }
-    header a { color: var(--accent2); text-decoration: none; margin-left: 14px; font-size: 13px; }
-    header a:hover { text-decoration: underline; }
-    .controls {
-      display: flex; flex-wrap: wrap; gap: 12px; align-items: end;
-      padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+    .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; color: inherit; }
+    .brand-mark { width: 30px; height: 30px; flex: none; }
+    .brand-mark svg { width: 100%; height: 100%; display: block; }
+    .brand-txt { display: flex; flex-direction: column; line-height: 1; }
+    .wordmark {
+      font-family: var(--serif); font-weight: 600; font-variation-settings: 'opsz' 144;
+      font-size: 23px; letter-spacing: -.012em; color: var(--ink);
     }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
-    select, input, button {
-      background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
-      border-radius: 8px; padding: 8px 10px; font-size: 13px; min-width: 90px;
+    .tagline {
+      font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+      color: var(--ink-3); margin-top: 5px; font-weight: 650;
     }
-    select { min-width: 200px; max-width: 340px; }
-    button {
-      background: var(--accent); color: #05130a; border: none; font-weight: 650;
-      cursor: pointer; min-width: 120px;
+    .spacer { flex: 1; }
+    .topnav { display: flex; gap: 4px; }
+    .topnav a {
+      display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2);
+      text-decoration: none; font-size: 12.5px; font-weight: 550;
+      padding: 6px 10px; border-radius: var(--r-sm);
     }
-    button:disabled { opacity: .5; cursor: default; }
+    .topnav a:hover { background: var(--paper-2); color: var(--ink); }
+    .topnav a .ic { color: var(--ink-3); }
+    .topnav-btn { display: inline-flex; align-items: center; justify-content: center; background: transparent;
+      border: 1px solid transparent; color: var(--ink-2); cursor: pointer; padding: 7px; border-radius: var(--r-sm); margin-right: 4px; }
+    .topnav-btn:hover { background: var(--paper-2); color: var(--ink); }
+    .topnav-btn .ic { width: 16px; height: 16px; }
+
+    /* ---------- toolbar ---------- */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+      padding: 16px 24px; background: var(--card); border-bottom: 1px solid var(--line);
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .field > label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .11em;
+      color: var(--ink-3); font-weight: 700; padding-left: 2px;
+    }
+    input, select, button { font-family: inherit; }
+    input[type=text], #year, select {
+      background: var(--card-2); color: var(--ink);
+      border: 1px solid var(--line-2); border-radius: var(--r);
+      padding: 9px 12px; font-size: 13.5px; height: 40px;
+      transition: border-color .12s, box-shadow .12s, background .12s;
+    }
+    input:focus, select:focus {
+      outline: none; border-color: var(--pine);
+      box-shadow: 0 0 0 3px var(--focus-ring); background: var(--card);
+    }
+    #year { width: 78px; text-align: center; font-variant-numeric: tabular-nums; }
+    .input-wrap { position: relative; display: flex; align-items: center; }
+    .input-wrap .search-ic { position: absolute; left: 11px; color: var(--ink-3); pointer-events: none; }
+    .input-wrap #tournInput { padding-left: 33px; min-width: 280px; max-width: 400px; width: 100%; }
+    .select-wrap { position: relative; display: flex; align-items: center; }
+    .select-wrap select { appearance: none; -webkit-appearance: none; padding-right: 32px; width: 100%; }
+    .select-wrap .chev { position: absolute; right: 11px; color: var(--ink-3); pointer-events: none; }
+    .field-player .select-wrap { min-width: 210px; } .field-player select { max-width: 340px; }
+    .field-round .select-wrap { min-width: 132px; }
+    .round-nav { display: flex; align-items: center; gap: 6px; }
+    .rnav { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 40px;
+      background: var(--card-2); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; padding: 0; }
+    .rnav:hover:not(:disabled) { background: var(--card); color: var(--pine); border-color: var(--pine); }
+    .rnav:disabled { opacity: .38; cursor: default; }
+    .rnav .ic { width: 15px; height: 15px; }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+      background: var(--pine); color: #F4EFE2; border: 1px solid var(--pine);
+      border-radius: var(--r); padding: 0 18px; height: 40px;
+      font-size: 13.5px; font-weight: 600; cursor: pointer;
+      box-shadow: var(--shadow-sm); transition: background .12s, transform .04s;
+    }
+    .btn-primary:hover { background: var(--pine-2); border-color: var(--pine-2); }
+    .btn-primary:active { transform: translateY(1px); }
+    .btn-primary:disabled { opacity: .5; cursor: default; }
+
     /* searchable tournament combobox */
     .combo { position: relative; }
-    #tournInput { min-width: 260px; max-width: 380px; }
     .combo-list {
-      position: absolute; top: 100%; left: 0; z-index: 30; margin-top: 4px; padding: 4px; list-style: none;
-      background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
-      width: max-content; min-width: 260px; max-width: 460px; max-height: 320px; overflow-y: auto;
-      box-shadow: 0 12px 34px rgba(0, 0, 0, .5);
+      position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; margin: 0; padding: 5px; list-style: none;
+      background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);
+      width: max-content; min-width: 280px; max-width: 460px; max-height: 340px; overflow-y: auto;
+      box-shadow: var(--shadow);
     }
     .combo-list li {
       display: flex; align-items: center; gap: 10px; justify-content: space-between;
-      padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;
+      padding: 8px 11px; border-radius: var(--r-sm); font-size: 13px; cursor: pointer; white-space: nowrap; color: var(--ink-2);
     }
     .combo-list li .tlabel { overflow: hidden; text-overflow: ellipsis; }
-    .combo-list li.active { background: var(--accent); color: #05130a; }
-    .combo-list li:hover:not(.active) { background: var(--line); }
-    .combo-list li.sel:not(.active) { color: var(--accent); font-weight: 650; }
-    .combo-list li.live:not(.active) { background: rgba(248, 113, 113, 0.12); }
+    .combo-list li:hover:not(.active) { background: var(--paper-2); color: var(--ink); }
+    .combo-list li.sel:not(.active) { color: var(--pine); font-weight: 640; }
+    .combo-list li.active { background: var(--pine); color: #F4EFE2; }
+    .combo-list li.live:not(.active) { background: var(--flag-tint); }
     .live-badge {
-      flex: none; font-size: 9.5px; font-weight: 800; letter-spacing: .4px; color: #fff;
-      background: var(--penalty); padding: 1px 6px; border-radius: 10px;
+      flex: none; font-size: 9px; font-weight: 800; letter-spacing: .05em; color: #fff;
+      background: var(--flag); padding: 2px 7px; border-radius: 20px; text-transform: uppercase;
     }
-    .live-badge::before { content: "● "; }
-    .combo-list li.active .live-badge { background: #05130a; color: var(--accent); }
-    .combo-empty { color: var(--muted); padding: 8px 10px; }
-    #status { padding: 10px 20px; color: var(--muted); font-size: 13px; min-height: 20px; }
-    #status.err { color: var(--penalty); }
-    main { padding: 8px 20px 60px; }
-    .summary { color: var(--muted); margin: 6px 0 18px; }
-    .summary b { color: var(--fg); }
-    .holes { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
-    .hole {
-      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-      overflow: hidden; display: flex; flex-direction: column;
-    }
-    .hole-hd {
-      display: flex; align-items: baseline; gap: 10px; padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
-    }
-    .hole-hd .num { font-size: 18px; font-weight: 700; }
-    .hole-hd .meta { color: var(--muted); font-size: 12px; }
-    .hole-hd .score { margin-left: auto; font-weight: 700; font-size: 15px; }
-    .hole-body { display: flex; gap: 12px; padding: 12px 14px; }
-    .plot { flex: 0 0 150px; }
-    .plot svg { width: 150px; height: 150px; background: #0c1a12; border-radius: 8px; border: 1px solid var(--line); }
-    .noplot { display: flex; align-items: center; justify-content: center; height: 150px; width: 150px;
-      color: var(--muted); font-size: 11px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
-    .strokes { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-    .strk { border-left: 3px solid var(--stroke); padding-left: 9px; }
-    .strk.putt { border-color: var(--putt); }
-    .strk.penalty { border-color: var(--penalty); }
-    .strk .pbp { font-size: 13px; }
-    .strk .loc { color: var(--muted); font-size: 11px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
-    .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
-      padding: 1px 6px; font-size: 10.5px; color: var(--muted); }
-    .chip b { color: var(--fg); font-weight: 600; }
-    .legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; margin: 4px 0 16px; }
-    .legend span::before { content: "●"; margin-right: 4px; }
-    .lg-stroke::before { color: var(--stroke); } .lg-putt::before { color: var(--putt); }
-    .lg-tee::before { content: "▲" !important; color: var(--accent); }
-    .lg-cup::before { content: "◎" !important; color: #fff; }
+    .live-badge::before { content: "●"; font-size: 7px; vertical-align: 1.5px; margin-right: 3px; }
+    .combo-list li.active .live-badge { background: #F4EFE2; color: var(--flag); }
+    .combo-empty { color: var(--ink-3); padding: 9px 11px; }
+
+    /* status line */
+    #status { padding: 12px 24px 0; color: var(--ink-3); font-size: 12.5px; min-height: 18px; }
+    #status.err { color: var(--flag); }
 
     /* view toggle */
-    .viewbar { display: flex; align-items: center; gap: 16px; padding: 10px 20px 0; flex-wrap: wrap; }
-    .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
-    .segbtn { background: transparent; color: var(--muted); border: none; border-radius: 7px;
-      padding: 6px 14px; font-size: 13px; cursor: pointer; min-width: 0; font-weight: 600; }
-    .segbtn.active { background: var(--accent); color: #05130a; }
+    .viewbar { display: flex; align-items: center; gap: 18px; padding: 16px 24px 0; flex-wrap: wrap; }
+    .seg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 3px; gap: 2px; }
+    .segbtn {
+      display: inline-flex; align-items: center; gap: 7px; background: transparent; color: var(--ink-2);
+      border: none; border-radius: var(--r-sm); padding: 7px 15px; font-size: 13px; cursor: pointer; font-weight: 600;
+    }
+    .segbtn .ic { color: var(--ink-3); }
+    .segbtn:hover:not(.active) { color: var(--ink); }
+    .segbtn.active { background: var(--card); color: var(--pine); box-shadow: var(--shadow-sm); }
+    .segbtn.active .ic { color: var(--pine); }
 
-    /* putts view */
-    .stat-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
-    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 96px; }
-    .stat .v { font-size: 20px; font-weight: 700; }
-    .stat .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
-    .lanewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; overflow-x: auto; }
-    .lanewrap h3 { margin: 0 0 4px; font-size: 14px; } .lanewrap .cap { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-    .lanewrap svg { width: 100%; min-width: 560px; height: auto; display: block; }
+    main { padding: 10px 24px 72px; max-width: 1200px; }
+    .summary { margin: 18px 0 12px; display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; }
+    .summary .who { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 25px; color: var(--ink); letter-spacing: -.01em; }
+    .summary .meta { color: var(--ink-3); font-size: 13px; }
+    .summary .meta b { color: var(--ink-2); }
+
+    /* freshness bar */
+    .asof {
+      display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ink-3); font-size: 12px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 6px 8px 6px 14px; margin: 0 0 18px;
+    }
+    .asof .clock { color: var(--sand); }
+    .asof b { color: var(--ink); font-weight: 600; }
+    .asof .loadms { color: var(--ink-3); cursor: help; }
+    .asof .sep { width: 1px; height: 14px; background: var(--line-2); }
+    .ibtn {
+      display: inline-flex; align-items: center; gap: 5px; background: var(--paper-2); color: var(--ink-2);
+      border: 1px solid var(--line-2); border-radius: 16px; padding: 4px 11px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+    }
+    .ibtn:hover { background: var(--card-2); color: var(--pine); border-color: var(--pine); }
+    .ibtn:disabled { opacity: .5; cursor: default; }
+    .ibtn .ic { color: var(--ink-3); } .ibtn:hover .ic { color: var(--pine); }
+
+    /* ---------- shot-trail cards ---------- */
+    .holes { display: grid; grid-template-columns: repeat(auto-fill, minmax(372px, 1fr)); gap: 16px; }
+    .hole { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+    .hole-hd { display: flex; align-items: baseline; gap: 11px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+    .hole-hd .num { font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 600; font-size: 22px; line-height: 1; color: var(--ink); }
+    .hole-hd .meta { color: var(--ink-3); font-size: 12px; }
+    .hole-hd .score { margin-left: auto; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .hole-body { padding: 14px 16px; }
+    .strokes { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+    .strk { border-left: 2.5px solid var(--charcoal); padding-left: 10px; }
+    .strk.putt { border-color: var(--sand); }
+    .strk.penalty { border-color: var(--flag); }
+    .strk .pbp { font-size: 13px; color: var(--ink); }
+    .strk .loc { color: var(--ink-3); font-size: 11px; margin-top: 1px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+    .chip { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+      padding: 2px 7px; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .chip b { color: var(--ink-2); font-weight: 640; }
+
+    /* ---------- first-putts card + tables ---------- */
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+      box-shadow: var(--shadow-sm); padding: 4px 20px 14px; margin-bottom: 18px; display: inline-block;
+      max-width: 100%; overflow-x: auto; }
+    /* daily view: front nine | back nine, scorecard style */
+    .card.scorecard { display: inline-flex; align-items: flex-start; padding: 6px 8px 12px; }
+    .scorecard .nine { padding: 0 12px; }
+    .scorecard .nine + .nine { border-left: 1px solid var(--line); }
+    .scorecard table.putts th, .scorecard table.putts td { padding: 8px 14px; }
+    /* shortest missed putts (daily view) */
+    .misspanel { margin: 6px 0 20px; }
+    .misspanel-hd { font-size: 12.5px; font-weight: 650; color: var(--ink-2); margin: 0 0 10px 2px; letter-spacing: .01em; }
+    .misspanel-hd .misspanel-sub { color: var(--ink-3); font-weight: 400; }
+    .misstiles { display: flex; flex-wrap: wrap; gap: 10px; }
+    .misstile { background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+      box-shadow: var(--shadow-sm); padding: 11px 15px; min-width: 118px; display: flex; flex-direction: column; gap: 6px; }
+    .mt-len { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 600; font-size: 25px;
+      line-height: 1; font-variant-numeric: tabular-nums; }
+    .mt-len .mt-unit { font-family: var(--sans); font-size: 12px; font-weight: 500; margin-left: 3px; color: var(--ink-3); }
+    .mt-meta { font-size: 11.5px; color: var(--ink-3); }
+    .mt-res { margin-top: 1px; }
+
+    .caphint { color: var(--ink-3); font-size: 12px; margin: 14px 2px 12px; line-height: 1.65; }
+    .caphint b { color: var(--ink-2); }
+    .caphint b.made { color: var(--good); } .caphint b.tp { color: var(--bad); }
+
     table.putts { border-collapse: collapse; width: auto; }
-    table.putts th, table.putts td { text-align: left; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
-    table.putts th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+    table.putts th, table.putts td { text-align: left; padding: 9px 20px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+    table.putts thead th { color: var(--ink-3); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .09em; border-bottom: 1.5px solid var(--line-2); }
+    table.putts tbody tr:last-child td { border-bottom: none; }
     table.putts td.num { text-align: right; font-variant-numeric: tabular-nums; }
-    table.putts tbody tr.made { background: rgba(74, 222, 128, 0.09); }
-    table.putts tbody tr.made td { font-weight: 650; }
-    table.putts tbody tr.made td.dist { color: var(--accent); }
-    table.putts tbody tr.threeputt { background: rgba(248, 113, 113, 0.11); }
-    table.putts tbody tr.threeputt td.dist { color: var(--penalty); font-weight: 650; }
-    .caphint { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
-    .caphint b.made { color: var(--accent); font-weight: 650; }
-    .caphint b.tp { color: var(--penalty); font-weight: 650; }
-    /* matrix key */
-    .mxkey { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; color: var(--muted); font-size: 12px; margin: 4px 0 14px; }
+    table.putts .dist { font-variant-numeric: tabular-nums; }
+    table.putts td.hole { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; font-size: 15px; color: var(--ink); }
+    table.putts tbody tr.made { background: var(--tint-good); }
+    table.putts tbody tr.made td.dist { color: var(--good); font-weight: 640; }
+    table.putts tbody tr.threeputt { background: var(--tint-bad); }
+    table.putts tbody tr.threeputt td.dist { color: var(--bad); font-weight: 640; }
+    .made-yes { color: var(--good); } .made-no { color: var(--bad); font-weight: 640; } .made-na { color: var(--ink-3); }
+    .putts-cnt { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .pill { display: inline-flex; align-items: center; padding: 2px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 650; letter-spacing: .01em; }
+    .pill.birdie { background: var(--tint-good-2); color: var(--good); }
+    .pill.par { background: var(--paper-2); color: var(--ink-2); }
+    .pill.bogey { background: var(--tint-warn-2); color: var(--warn); }
+    .pill.double { background: var(--tint-bad-2); color: var(--bad); }
+
+    /* matrix */
+    .mxkey { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; color: var(--ink-3); font-size: 12px; margin: 14px 2px 14px; }
     .mxkey .kgrp { display: inline-flex; align-items: center; gap: 8px; }
-    .mxkey .kt { text-transform: uppercase; letter-spacing: .4px; font-size: 10px; opacity: .75; }
-    .mxkey .ksw { width: 22px; height: 15px; border-radius: 4px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #05130a; }
-    .mxkey .ksw.made { background: rgba(74, 222, 128, 0.85); }
-    .mxkey .ksw.threeputt { background: rgba(248, 113, 113, 0.85); }
+    .mxkey .kt { text-transform: uppercase; letter-spacing: .09em; font-size: 9.5px; font-weight: 700; opacity: .85; }
+    .mxkey .ksw { width: 22px; height: 16px; border-radius: 4px; border: 1px solid var(--line-2); display: inline-flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; }
+    .mxkey .ksw.made { background: var(--tint-good-2); color: var(--good); }
+    .mxkey .ksw.threeputt { background: var(--tint-bad-2); color: var(--bad); }
     .mxkey .knum { font-weight: 700; }
-    /* all-rounds matrix */
-    table.putts td.mx { text-align: right; min-width: 52px; font-variant-numeric: tabular-nums; line-height: 1.15; }
-    table.putts td.mx.made { background: rgba(74, 222, 128, 0.14); font-weight: 650; }
-    table.putts td.mx.threeputt { background: rgba(248, 113, 113, 0.16); font-weight: 650; }
-    table.putts td.mx .og { color: var(--muted); }
-    .mx .mput { display: block; }
-    .mx .mappr { display: block; font-size: 9.5px; font-weight: 400; color: var(--muted); }
-    table.putts td.mxgap, table.putts th.mxgap { width: 22px; border: none; padding: 0; }
-    table.putts th.mxhdr { text-align: center; color: var(--muted); font-size: 10px; }
-    /* cache freshness bar */
-    .asof { color: var(--muted); font-size: 12px; margin: 2px 0 12px; display: inline-flex; align-items: center; gap: 8px; }
-    .asof b { color: var(--fg); font-weight: 600; }
-    .refresh-btn { background: var(--panel2); color: var(--accent2); border: 1px solid var(--line); border-radius: 6px;
-      padding: 2px 9px; font-size: 11px; font-weight: 600; cursor: pointer; min-width: 0; }
-    .refresh-btn:hover { background: var(--line); }
-    .refresh-btn:disabled { opacity: .5; cursor: default; }
-    .loadms { color: var(--muted); cursor: help; }
-    .pill { display: inline-block; padding: 1px 9px; border-radius: 20px; font-size: 12px; font-weight: 650; }
+    table.putts td.mx { text-align: right; min-width: 54px; font-variant-numeric: tabular-nums; line-height: 1.18; }
+    table.putts td.mx.made { background: var(--tint-good); }
+    table.putts td.mx.threeputt { background: var(--tint-bad); }
+    table.putts td.mx .og { color: var(--ink-3); }
+    .mx .mput { display: block; font-weight: 640; font-size: 14px; }
+    .mx .mappr { display: block; font-size: 9.5px; font-weight: 500; color: var(--ink-3); }
+    table.putts td.mxgap, table.putts th.mxgap { width: 20px; border: none; padding: 0; }
+    table.putts th.mxhdr { text-align: center; color: var(--sand); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border-bottom: none; padding-bottom: 3px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>golf_api <span class="sub">· Shot Explorer</span></h1>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Fairway — home">
+      <span class="brand-mark">
+        <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <path d="M4 22.5 Q14 18.8 24 22.5" stroke="var(--pine)" stroke-width="1.9" stroke-linecap="round"/>
+          <line x1="9.5" y1="6" x2="9.5" y2="22.2" stroke="var(--pine)" stroke-width="2.1" stroke-linecap="round"/>
+          <path d="M9.5 6 L20.5 8.4 L9.5 10.8 Z" fill="var(--flag)"/>
+          <circle cx="9.5" cy="22.2" r="1.4" fill="var(--pine)"/>
+        </svg>
+      </span>
+      <span class="brand-txt">
+        <span class="wordmark">Fairway</span>
+        <span class="tagline">PGA Shot Explorer</span>
+      </span>
+    </a>
     <div class="spacer"></div>
-    <a href="/graphiql">GraphiQL ↗</a>
-    <a href="/docs">REST docs ↗</a>
+    <nav class="topnav">
+      <button id="themeToggle" class="topnav-btn" type="button" aria-label="Toggle light or dark theme"></button>
+      <a href="/graphiql">GraphiQL <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 8.5v3A1.5 1.5 0 0 1 11 13H4.5A1.5 1.5 0 0 1 3 11.5V5A1.5 1.5 0 0 1 4.5 3.5h3"/><path d="M9.5 3h3.5v3.5"/><path d="M13 3 8 8"/></svg></a>
+      <a href="/docs">REST docs <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 8.5v3A1.5 1.5 0 0 1 11 13H4.5A1.5 1.5 0 0 1 3 11.5V5A1.5 1.5 0 0 1 4.5 3.5h3"/><path d="M9.5 3h3.5v3.5"/><path d="M13 3 8 8"/></svg></a>
+    </nav>
   </header>
 
-  <div class="controls">
+  <div class="toolbar">
     <div class="field">
       <label for="year">Season</label>
-      <input id="year" value="2026" size="5" style="min-width:70px" />
+      <input id="year" value="2026" inputmode="numeric" />
     </div>
     <div class="field combo">
       <label for="tournInput">Tournament</label>
-      <input type="hidden" id="tourn" />
-      <input type="text" id="tournInput" autocomplete="off" spellcheck="false"
-             role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="tournList"
-             placeholder="Search tournaments…" />
+      <div class="input-wrap">
+        <svg class="ic search-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4"/><path d="M10 10 13.6 13.6"/></svg>
+        <input type="hidden" id="tourn" />
+        <input type="text" id="tournInput" autocomplete="off" spellcheck="false"
+               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="tournList"
+               placeholder="Search tournaments…" />
+      </div>
       <ul id="tournList" class="combo-list" role="listbox" hidden></ul>
     </div>
-    <div class="field">
+    <div class="field field-player">
       <label for="player">Player</label>
-      <select id="player"><option>pick a tournament</option></select>
+      <div class="select-wrap">
+        <select id="player"><option>pick a tournament</option></select>
+        <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+      </div>
     </div>
-    <div class="field">
+    <div class="field field-round">
       <label for="round">Round</label>
-      <select id="round">
-        <option value="1">1</option><option value="2">2</option>
-        <option value="3">3</option><option value="4">4</option>
-        <option value="all" selected>All rounds</option>
-      </select>
+      <div class="round-nav">
+        <button class="rnav" data-step="-1" type="button" aria-label="Previous round" title="Previous round">
+          <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8 10 12.5"/></svg>
+        </button>
+        <div class="select-wrap">
+          <select id="round">
+            <option value="1">Round 1</option><option value="2">Round 2</option>
+            <option value="3">Round 3</option><option value="4">Round 4</option>
+            <option value="all" selected>All rounds</option>
+          </select>
+          <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+        </div>
+        <button class="rnav" data-step="1" type="button" aria-label="Next round" title="Next round">
+          <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
+        </button>
+      </div>
     </div>
-    <button id="go">Load shots</button>
+    <button id="go" class="btn-primary">
+      <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11"/><path d="M9 3.5 13.5 8 9 12.5"/></svg>
+      Load
+    </button>
   </div>
 
   <div id="status"></div>
   <div class="viewbar">
-    <div class="seg">
-      <button class="segbtn" data-view="trails">Shot trails</button>
-      <button class="segbtn active" data-view="putts">First putts</button>
-    </div>
-    <div id="legend" class="legend" style="display:none">
-      <span class="lg-tee">Tee</span>
-      <span class="lg-stroke">Stroke</span>
-      <span class="lg-putt">Putt</span>
-      <span class="lg-cup">Hole</span>
+    <div class="seg" role="tablist">
+      <button class="segbtn active" data-view="putts" role="tab">
+        <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/></svg>
+        First putts
+      </button>
+      <button class="segbtn" data-view="shots" role="tab">
+        <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11"/><path d="M2.5 8h11"/><path d="M2.5 12h7"/></svg>
+        Shots
+      </button>
     </div>
   </div>
   <main><div id="out"></div></main>
@@ -214,6 +394,35 @@
     const $ = (id) => document.getElementById(id);
     const status = (msg, err = false) => { const s = $('status'); s.textContent = msg || ''; s.className = err ? 'err' : ''; };
     const api = async (path) => { const r = await fetch(path); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json(); };
+
+    // inline SVG icons (stroke = currentColor)
+    const ICONS = {
+      refresh: '<path d="M13.4 8a5.4 5.4 0 1 1-1.7-3.9"/><path d="M13.6 3.1v3.4h-3.4"/>',
+      link: '<path d="M6.6 9.4 9.4 6.6"/><path d="M7.3 4.7 8.3 3.7a2.6 2.6 0 0 1 3.7 3.7l-1 1"/><path d="M8.7 11.3l-1 1a2.6 2.6 0 0 1-3.7-3.7l1-1"/>',
+      clock: '<circle cx="8" cy="8" r="5.3"/><path d="M8 5v3.2l2 1.3"/>',
+      check: '<path d="M3.6 8.4 6.5 11.3 12.4 4.8"/>',
+      sun: '<circle cx="8" cy="8" r="3.1"/><path d="M8 1.4v1.7M8 12.9v1.7M14.6 8h-1.7M3.1 8H1.4M12.6 3.4l-1.2 1.2M4.6 11.4l-1.2 1.2M12.6 12.6l-1.2-1.2M4.6 4.6 3.4 3.4"/>',
+      moon: '<path d="M13.2 9.4A5.5 5.5 0 1 1 6.6 2.8 4.4 4.4 0 0 0 13.2 9.4z"/>',
+    };
+    const icon = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+
+    // --- light / dark theme -------------------------------------------------
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      const btn = $('themeToggle');
+      if (btn) {
+        btn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon');
+        btn.title = t === 'dark' ? 'Switch to light' : 'Switch to dark';
+      }
+    }
+    function initTheme() {
+      applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+      $('themeToggle').addEventListener('click', () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme', next);
+        applyTheme(next);
+      });
+    }
 
     // --- tournament typeahead combobox -----------------------------------
     let tournFiltered = [];
@@ -251,12 +460,18 @@
       $('tournInput').setAttribute('aria-expanded', 'false');
       tournActive = -1;
     }
-    function setActiveTourn(i) {
+    function setActiveTourn(i, block = 'nearest') {
       const items = [...$('tournList').querySelectorAll('li[role=option]')];
       if (!items.length) return;
       tournActive = Math.max(0, Math.min(i, items.length - 1));
       items.forEach((el, idx) => el.classList.toggle('active', idx === tournActive));
-      items[tournActive].scrollIntoView({ block: 'nearest' });
+      items[tournActive].scrollIntoView({ block });
+    }
+    // On open (no filter), stick to the currently-shown tournament: highlight it
+    // and scroll it into view rather than starting at the top of the list.
+    function highlightSelectedTourn() {
+      const idx = tournFiltered.findIndex(t => t.id === $('tourn').value);
+      if (idx >= 0) setActiveTourn(idx, 'center');
     }
     function selectTourn(id, opts = {}) {
       const t = state.tournaments.find(x => x.id === id);
@@ -268,7 +483,7 @@
     }
     function setupTournCombo() {
       const tin = $('tournInput');
-      tin.addEventListener('focus', () => { tin.select(); renderTournList(''); });
+      tin.addEventListener('focus', () => { tin.select(); renderTournList(''); highlightSelectedTourn(); });
       tin.addEventListener('input', () => { renderTournList(tin.value); if (tournFiltered.length) setActiveTourn(0); });
       tin.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') { e.preventDefault(); if ($('tournList').hidden) renderTournList(tin.value); setActiveTourn(tournActive + 1); }
@@ -320,9 +535,9 @@
       syncUrl();
       try {
         await navigator.clipboard.writeText(location.href);
-        const orig = btn.textContent;
-        btn.textContent = '✓ copied';
-        setTimeout(() => { btn.textContent = orig; }, 1500);
+        const orig = btn.innerHTML;
+        btn.innerHTML = `${icon('check')} copied`;
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
       } catch (e) {
         status('Copy failed — copy the URL from the address bar instead.', true);
       }
@@ -345,62 +560,12 @@
         // remember the tournament's latest round with data (used as the
         // Shot-trails default; First putts stays on "All rounds").
         state.currentRound = data.currentRound || null;
+        updateRoundNav();
         status(`${data.players.length} players in the field.`);
       } catch (e) { sel.innerHTML = '<option>—</option>'; status('Field failed: ' + e.message, true); }
     }
 
-    // ---- shot-trail rendering -------------------------------------------
-    function coord(c) {
-      if (!c) return null;
-      const x = c.tourcastX, y = c.tourcastY;
-      if (x == null || y == null || x <= 0 || y <= 0) return null; // -1 / 0 == no data
-      return { x, y };
-    }
-
-    function plotHole(strokes) {
-      const segs = [];
-      for (const s of strokes) {
-        const lr = s.overview && s.overview.leftToRightCoords;
-        if (!lr) continue;
-        const f = coord(lr.fromCoords), t = coord(lr.toCoords);
-        if (f && t) segs.push({ f, t, type: (s.strokeType || '').toUpperCase() });
-      }
-      if (segs.length === 0) return `<div class="noplot">no shot<br>coordinates</div>`;
-
-      const pts = segs.flatMap(s => [s.f, s.t]);
-      const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-      let minX = Math.min(...xs), maxX = Math.max(...xs);
-      let minY = Math.min(...ys), maxY = Math.max(...ys);
-      const spanX = maxX - minX || 1, spanY = maxY - minY || 1;
-      const span = Math.max(spanX, spanY);           // keep aspect ratio (square)
-      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-      const V = 150, PAD = 16, S = (V - 2 * PAD) / span;
-      const px = (x) => PAD + (x - cx) * S + (V - 2 * PAD) / 2;
-      const py = (y) => V - (PAD + (y - cy) * S + (V - 2 * PAD) / 2); // flip Y
-
-      let svg = `<svg viewBox="0 0 ${V} ${V}">`;
-      // segments
-      segs.forEach((s) => {
-        const putt = s.type === 'PUTT';
-        const col = s.type === 'PENALTY' ? 'var(--penalty)' : putt ? 'var(--putt)' : 'var(--stroke)';
-        svg += `<line x1="${px(s.f.x)}" y1="${py(s.f.y)}" x2="${px(s.t.x)}" y2="${py(s.t.y)}"
-                 stroke="${col}" stroke-width="${putt ? 1.4 : 2}" stroke-linecap="round"
-                 ${putt ? 'stroke-dasharray="2 2"' : ''} opacity="0.9"/>`;
-      });
-      // landing dots
-      segs.forEach((s, i) => {
-        if (i === segs.length - 1) return;
-        svg += `<circle cx="${px(s.t.x)}" cy="${py(s.t.y)}" r="2.4" fill="#fff" opacity="0.85"/>`;
-      });
-      // tee + cup
-      const tee = segs[0].f, cup = segs[segs.length - 1].t;
-      svg += `<path d="M ${px(tee.x)} ${py(tee.y) - 4} L ${px(tee.x) - 3.5} ${py(tee.y) + 3} L ${px(tee.x) + 3.5} ${py(tee.y) + 3} Z" fill="var(--accent)"/>`;
-      svg += `<circle cx="${px(cup.x)}" cy="${py(cup.y)}" r="4" fill="none" stroke="#fff" stroke-width="1.5"/>`;
-      svg += `<circle cx="${px(cup.x)}" cy="${py(cup.y)}" r="1.4" fill="#fff"/>`;
-      svg += `</svg>`;
-      return svg;
-    }
-
+    // ---- shot-by-shot rendering -----------------------------------------
     function radarChips(r) {
       if (!r) return '';
       const bits = [];
@@ -427,10 +592,9 @@
         <div class="hole-hd">
           <span class="num">${h.holeNumber}</span>
           <span class="meta">Par ${h.par} · ${h.yardage} yds</span>
-          <span class="score">${h.score ?? ''}</span>
+          <span class="score" style="color:${resultColor((h.score != null && h.par != null) ? h.score - h.par : null)}">${h.score ?? ''}</span>
         </div>
         <div class="hole-body">
-          <div class="plot">${plotHole(h.strokes || [])}</div>
           <div class="strokes">${(h.strokes || []).map(renderStroke).join('')}</div>
         </div>
       </div>`;
@@ -438,59 +602,90 @@
 
     const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], view: 'putts' };
     const playerLabel = () => $('player').selectedOptions[0]?.textContent.trim() || $('player').value;
+    // strip a leading "pos  " prefix off the option label for the editorial heading
+    const playerName = () => playerLabel().replace(/^\S+\s+/, '').replace(/\s+\([^)]*\)\s*$/, '') || playerLabel();
 
-    function renderTrails() {
+    function renderShots() {
       const d = state.shots;
       if (!d) { $('out').innerHTML = ''; return; }
       const holes = d.holes || [];
       $('out').innerHTML =
-        `<div class="summary"><b>${playerLabel()}</b> — round ${d.round} · <b>${holes.length}</b> holes</div>
+        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b> · shot-by-shot · <b>${holes.length}</b> holes</span></div>
          ${asOfBar(state.shotsTs)}
          <div class="holes">${holes.map(renderHole).join('')}</div>`;
     }
 
     // ---- first-putts view -----------------------------------------------
     function resultColor(diff) {
-      if (diff == null) return 'var(--muted)';
-      if (diff < 0) return 'var(--accent)';   // birdie or better
-      if (diff === 0) return '#cbd5e1';        // par
-      if (diff === 1) return 'var(--stroke)';  // bogey
-      return 'var(--penalty)';                 // double+
+      if (diff == null) return 'var(--ink-3)';
+      if (diff < 0) return 'var(--good)';    // birdie or better
+      if (diff === 0) return 'var(--neutral)'; // par
+      if (diff === 1) return 'var(--warn)';  // bogey
+      return 'var(--bad)';                   // double+
+    }
+    function pillClass(diff) {
+      if (diff == null) return 'par';
+      if (diff < 0) return 'birdie';
+      if (diff === 0) return 'par';
+      if (diff === 1) return 'bogey';
+      return 'double';
+    }
+    const ordPutt = (n) => (['', '1st', '2nd', '3rd', '4th', '5th', '6th'][n] || `${n}th`);
+
+    // The 5 shortest putts the player missed this round (daily view only).
+    function shortestMissedPanel(list) {
+      if (!list || !list.length) return '';
+      const missColor = (ft) => ft < 4 ? 'var(--flag)' : ft < 8 ? 'var(--sand)' : 'var(--ink-2)';
+      const tiles = list.map(m => `
+        <div class="misstile" title="Hole ${m.hole}: missed a ${m.lengthFt} ft ${ordPutt(m.puttNumber)} putt · ${m.result}">
+          <div class="mt-len" style="color:${missColor(m.lengthFt)}">${m.lengthFt}<span class="mt-unit">ft</span></div>
+          <div class="mt-meta">Hole ${m.hole} · ${ordPutt(m.puttNumber)} putt</div>
+          <div class="mt-res"><span class="pill ${pillClass(m.scoreToPar)}">${m.result}</span></div>
+        </div>`).join('');
+      return `<div class="misspanel">
+        <div class="misspanel-hd">Shortest putts missed<span class="misspanel-sub"> — the shortest putts that didn't drop this round</span></div>
+        <div class="misstiles">${tiles}</div>
+      </div>`;
     }
 
     function renderPutts() {
       const d = state.putts;
       if (!d) { $('out').innerHTML = ''; return; }
       const rows = d.holes.slice().sort((a, b) => a.hole - b.hole);
-      const trows = rows.map(r => {
+      const rowHtml = (r) => {
         const cls = r.putts === 1 ? 'made' : r.putts >= 3 ? 'threeputt' : '';
         const had = r.approachHad
           ? `<span title="hit it ${r.approachDist || '?'} from ${r.approachFrom || '?'}">${r.approachHad}</span>`
-          : '<span style="color:var(--muted)">—</span>';
+          : '<span class="made-na">—</span>';
         const prox = r.firstPuttFt != null ? r.firstPuttFt + ' ft'
-          : '<span style="color:var(--muted)">off green</span>';
-        const made = r.holedOffGreen
-          ? '<span style="color:var(--muted)" title="holed from off the green — no putt">—</span>'
-          : r.putts === 1
-            ? '<span style="color:var(--accent);font-weight:700" title="first putt holed">✓</span>'
-            : `<span style="color:var(--penalty)" title="${r.putts}-putt">✗</span>`;
-        const col = resultColor(r.scoreToPar);
+          : '<span class="made-na" title="holed from off the green — no first putt to measure">holed out</span>';
+        const puttsCell = r.holedOffGreen
+          ? '<span class="made-na" title="holed from off the green — no putt on this hole">—</span>'
+          : `<span class="${r.putts === 1 ? 'made-yes' : r.putts >= 3 ? 'made-no' : 'putts-cnt'}" title="${r.putts} putt${r.putts === 1 ? '' : 's'}">${r.putts}</span>`;
         return `<tr class="${cls}">
-          <td class="num">${r.hole}</td>
+          <td class="hole">${r.hole}</td>
           <td class="num">${had}</td>
           <td class="num dist">${prox}</td>
-          <td class="num">${made}</td>
-          <td><span class="pill" style="background:${col};color:#05130a">${r.result}</span></td>
+          <td class="num">${puttsCell}</td>
+          <td><span class="pill ${pillClass(r.scoreToPar)}">${r.result}</span></td>
         </tr>`;
-      }).join('');
+      };
+      const nine = (label, rws) => rws.length ? `<div class="nine">
+        <table class="putts">
+          <thead>
+            <tr><th class="mxhdr" colspan="5">${label}</th></tr>
+            <tr><th>Hole</th><th>Had</th><th>Proximity</th><th>Putts</th><th>Result</th></tr>
+          </thead>
+          <tbody>${rws.map(rowHtml).join('')}</tbody>
+        </table></div>` : '';
+      const front = nine('Front', rows.filter(r => r.hole <= 9));
+      const back = nine('Back', rows.filter(r => r.hole > 9));
       $('out').innerHTML =
-        `<div class="summary"><b>${playerLabel()}</b> — round ${d.round}</div>
+        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b> · first putts</span></div>
          ${asOfBar(state.puttsTs)}
-         <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Made</b> = first putt holed (<b class="made">green</b> row) · <b class="tp">red</b> = 3-putt+</div>
-         <table class="putts">
-           <thead><tr><th>Hole</th><th>Had</th><th>Proximity</th><th>Made</th><th>Result</th></tr></thead>
-           <tbody>${trows}</tbody>
-         </table>`;
+         ${shortestMissedPanel(d.shortestMissed)}
+         <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Putts</b> = putts taken on the hole · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
+         <div class="card scorecard">${front}${back}</div>`;
     }
 
     // Compact approach distance for the matrix: "93 yds"->"93y", "46 ft 2 in."->"46'".
@@ -511,7 +706,7 @@
       const scored = h => h && h.score != null && h.score !== '' && h.score !== '-';
       const roundPlayed = r => byRound[r] && (byRound[r].holes || []).some(scored);
       const played = [1, 2, 3, 4].filter(roundPlayed);
-      if (!played.length) { $('out').innerHTML = '<div class="summary">No rounds available for this player.</div>'; return; }
+      if (!played.length) { $('out').innerHTML = '<div class="summary"><span class="meta">No rounds available for this player.</span></div>'; return; }
       const map = {}; played.forEach(r => { map[r] = {}; byRound[r].holes.forEach(h => map[r][h.hole] = h); });
       const holes = [...new Set(played.flatMap(r => byRound[r].holes.filter(scored).map(h => h.hole)))].sort((a, b) => a - b);
       const frontHoles = holes.filter(h => h <= 9);
@@ -531,7 +726,7 @@
       // one nine's worth of cells for a given hole (empty if that hole is absent)
       const nineCells = (hole) => hole == null
         ? `<td class="num"></td>${played.map(() => '<td class="mx"></td>').join('')}`
-        : `<td class="num">${hole}</td>${played.map(r => cell(map[r][hole])).join('')}`;
+        : `<td class="num hole">${hole}</td>${played.map(r => cell(map[r][hole])).join('')}`;
 
       const span = 1 + played.length;
       const roundHdr = `<th class="num">Hole</th>${played.map(r => `<th class="num">R${r}</th>`).join('')}`;
@@ -553,27 +748,26 @@
         <div class="kgrp"><span class="kt">Per cell</span>
           <span class="knum">12.2</span> proximity ft <span class="mappr" style="display:inline">/ 117y</span> had</div>
         <div class="kgrp"><span class="kt">Number = score</span>
-          <span class="knum" style="color:var(--accent)">Birdie+</span>
-          <span class="knum" style="color:#cbd5e1">Par</span>
-          <span class="knum" style="color:var(--stroke)">Bogey</span>
-          <span class="knum" style="color:var(--penalty)">Dbl+</span></div>
+          <span class="knum" style="color:var(--good)">Birdie+</span>
+          <span class="knum" style="color:var(--neutral)">Par</span>
+          <span class="knum" style="color:var(--warn)">Bogey</span>
+          <span class="knum" style="color:var(--bad)">Dbl+</span></div>
         <div class="kgrp"><span class="og">–</span> holed off green</div>
       </div>`;
       $('out').innerHTML =
-        `<div class="summary"><b>${playerLabel()}</b> — all rounds · first-putt length (ft)</div>
+        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">All rounds · first-putt length (ft)</span></div>
          ${asOfBar(asOf)}
          ${key}
-         <table class="putts"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+         <div class="card"><table class="putts"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
     }
 
     function renderView() {
-      $('legend').style.display = state.view === 'trails' ? '' : 'none';
       if (state.puttsAll) {
-        if (state.view === 'trails') $('out').innerHTML = '<div class="summary">Select a single round to see shot trails.</div>';
+        if (state.view === 'shots') $('out').innerHTML = '<div class="summary"><span class="meta">Select a single round to see shot-by-shot detail.</span></div>';
         else renderPuttsAll();
         return;
       }
-      (state.view === 'trails' ? renderTrails : renderPutts)();
+      (state.view === 'shots' ? renderShots : renderPutts)();
     }
 
     // --- session cache: completed rounds only; live round always re-fetched ---
@@ -598,7 +792,10 @@
         : `/api/putts?tournamentId=${tid}&playerId=${pid}&round=${round}${refreshQ}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-      const entry = { data: await r.json(), ts: Date.now() };
+      // "data current as of" = when the server actually captured the data from
+      // PGA (header), not the browser's fetch time. Falls back to now.
+      const fetchedAt = Number(r.headers.get('X-Data-Fetched-At')) || Date.now();
+      const entry = { data: await r.json(), ts: fetchedAt };
       const source = r.headers.get('X-Cache') === 'HIT' ? 'redis' : 'live';
       if (cacheable) dataCache.set(key, entry); else dataCache.delete(key);
       return { ...entry, source };
@@ -612,11 +809,11 @@
       if (state.loadMs != null) {
         const src = state.loadCached ? 'cached' : 'live';
         const tip = state.loadCached ? 'served from cache (Redis / in-memory)' : 'fetched live from the PGA API';
-        load = ` · <span class="loadms" title="${tip}">loaded in ${state.loadMs} ms · ${src}</span>`;
+        load = `<span class="sep"></span><span class="loadms" title="${tip}">loaded in ${state.loadMs} ms · ${src}</span>`;
       }
-      return `<div class="asof">data current as of <b>${fmtWhen(ts)}</b>${load}
-        <button class="refresh-btn" type="button">↻ refresh</button>
-        <button class="refresh-btn copylink-btn" type="button">🔗 copy link</button></div>`;
+      return `<div class="asof">${icon('clock', 'clock')} data current as of <b>${fmtWhen(ts)}</b>${load}
+        <button class="ibtn refresh-btn" type="button" title="Re-fetch from source">${icon('refresh')} refresh</button>
+        <button class="ibtn copylink-btn" type="button" title="Copy a shareable link">${icon('link')} copy link</button></div>`;
     }
 
     async function loadShots(opts = {}) {
@@ -677,7 +874,25 @@
       } catch (e) {
         state.shots = state.putts = state.puttsAll = null;
         status('Load failed: ' + e.message + '  (player may not have played this round)', true);
-      } finally { $('go').disabled = false; }
+      } finally { $('go').disabled = false; updateRoundNav(); }
+    }
+
+    // --- round prev/next stepping ------------------------------------------
+    const maxRound = () => Number(state.currentRound) || 4;
+    function updateRoundNav() {
+      const v = $('round').value, mx = maxRound();
+      const prev = document.querySelector('.rnav[data-step="-1"]');
+      const next = document.querySelector('.rnav[data-step="1"]');
+      if (prev) prev.disabled = v !== 'all' && Number(v) <= 1;
+      if (next) next.disabled = v !== 'all' && Number(v) >= mx;
+    }
+    function stepRound(step) {
+      const v = $('round').value, mx = maxRound();
+      const target = v === 'all' ? (step > 0 ? 1 : mx) : Math.min(mx, Math.max(1, Number(v) + step));
+      if (String(target) === v) return;
+      $('round').value = String(target);
+      updateRoundNav();
+      loadShots();
     }
 
     function setActiveView(view) {
@@ -687,9 +902,9 @@
     document.querySelectorAll('.segbtn').forEach(btn => btn.addEventListener('click', () => {
       const view = btn.dataset.view;
       setActiveView(view);
-      // Shot trails is per-round. If "All rounds" is selected, switch the picker
-      // to the latest played round and load it so trails render immediately.
-      if (view === 'trails' && $('round').value === 'all') {
+      // Shots is per-round. If "All rounds" is selected, switch the picker
+      // to the latest played round and load it so shot detail renders immediately.
+      if (view === 'shots' && $('round').value === 'all') {
         const scored = h => h && h.score != null && h.score !== '' && h.score !== '-';
         const latest = state.puttsAll
           ? [4, 3, 2, 1].find(r => state.puttsAll[r] && (state.puttsAll[r].holes || []).some(scored))
@@ -703,6 +918,8 @@
     }));
     $('year').addEventListener('change', () => loadTournaments());
     $('go').addEventListener('click', () => loadShots());
+    document.querySelectorAll('.rnav').forEach(b => b.addEventListener('click', () => stepRound(Number(b.dataset.step))));
+    $('round').addEventListener('change', updateRoundNav);
     $('out').addEventListener('click', (e) => {
       const copyBtn = e.target.closest('.copylink-btn');
       if (copyBtn) { copyLink(copyBtn); return; }
@@ -711,10 +928,11 @@
 
     // Restore selection from the URL (shared link / reload), then auto-load.
     async function init() {
+      initTheme();
       setupTournCombo();
       const q = new URLSearchParams(location.search);
       const wantT = q.get('t'), wantP = q.get('p'), wantR = q.get('r'), wantV = q.get('v');
-      if (wantV === 'trails') setActiveView('trails');
+      if (wantV === 'shots' || wantV === 'trails') setActiveView('shots');
       if (wantT && /^R\d{7}$/.test(wantT)) $('year').value = wantT.slice(1, 5);
       await loadTournaments(wantT);
       if (wantP) selectPlayer(wantP);

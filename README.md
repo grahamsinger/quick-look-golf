@@ -2,7 +2,8 @@
 
 Client and schema tooling for the **unofficial PGA TOUR GraphQL API** — the
 backend behind pgatour.com and its TOURCAST shot-tracker, and a free source of
-genuine shot-by-shot (ShotLink-derived) data.
+genuine shot-by-shot (ShotLink-derived) data — plus **Fairway**, a local
+putting-focused web app for browsing it (light + dark).
 
 > ⚠️ Unofficial, undocumented, and governed by the pgatour.com Terms of Service.
 > See [`STATUS.md`](STATUS.md) for the full picture, caveats, and alternatives.
@@ -26,24 +27,35 @@ Then open:
 | http://127.0.0.1:8600/graphiql | **GraphiQL** — full-API playground with autocomplete (introspection is on) |
 | http://127.0.0.1:8600/docs | **Swagger UI** for the REST convenience endpoints |
 
-### Shot Explorer
+### Shot Explorer — "Fairway"
 
-- **Controls:** season, a **searchable tournament combobox** (dates, "LIVE" badge
-  on the in-progress event, which is the default), player (defaults to the leader),
-  round (1–4 or **All rounds**, the default). Opens straight to the live event.
-- **Shot trails** view: per-hole cards with an SVG shot path (tee → landing → cup),
-  play-by-play, and TrackMan radar (ball/club speed, launch, spin, apex).
-- **First putts** view:
-  - *Single round* — table of **Hole · Had · Proximity · Made · Result**, where
-    *Had* = distance to the pin before the approach, *Proximity* = how close it
-    finished (first-putt length), *Made* = first putt holed. Green row = 1-putt,
-    red = 3-putt+.
-  - *All rounds* — a **front/back matrix** (9 rows, nines side by side): each cell
-    shows proximity (big) over the had-distance (small), colored by score.
+A dependency-free (vanilla JS) single page with a light **editorial "Fairway"
+theme** and a **dark mode** — sun/moon toggle (top right) that remembers your
+choice and follows the system default. Self-hosted Fraunces display serif.
+
+- **Controls:** season, a **searchable tournament combobox** (dates + a "LIVE"
+  badge on the in-progress event; opens *sticky to the current selection*),
+  player (defaults to the leader), and round — **‹ ›** arrows step through a
+  tournament's days, or pick **All rounds** (the default).
+- **First putts** (default view):
+  - *Single round* — a **Front | Back scorecard** (both nines side by side, all
+    18 holes at once): **Hole · Had · Proximity · Putts · Result**, where *Had* =
+    distance to the pin before the approach, *Proximity* = how close the first
+    putt finished, *Putts* = putts taken (green = 1-putt, red row = 3-putt+). A
+    hole finished from off the green shows **"holed out."**
+  - A **Shortest putts missed** panel — the five shortest putts the player didn't
+    convert that round (a "miss" is any putt that wasn't the holed stroke, so a
+    short comeback 2nd/3rd putt ranks correctly).
+  - *All rounds* — a **front/back matrix** (nines side by side): each cell shows
+    proximity (big) over the had-distance (small), colored by score.
+- **Shots** view: per-hole shot-by-shot play-by-play with distances and TrackMan
+  numbers (ball/club speed, launch, spin, apex). *(No shot-trail plot — a spatial
+  view would need the real hole image; see `NEXT_STEPS.md`.)*
 - **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=`), so a
-  reload restores the view and a **🔗 copy link** button shares it. A freshness
-  bar shows **"data current as of … · loaded in N ms · cached/live"** with a
-  **↻ refresh** that force-re-fetches (busting the cache for the rare ShotLink
+  reload restores the view and a **copy-link** button shares it. A freshness bar
+  shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp
+  is when the data was actually captured from PGA (server-stamped), and
+  **refresh** force-re-fetches (busting the cache for the rare ShotLink
   correction).
 
 The server proxies GraphQL through `POST /api/graphql` and injects the API key,
@@ -53,20 +65,23 @@ so the browser never handles the key and there are no CORS issues.
 
 Completed rounds are immutable, so the server caches the **raw radar-on
 `shotDetailsV3` payload once per (tournament, player, round)** in Redis with no
-expiry; both `/api/shots` and `/api/putts` derive from that single entry
-(verified lossless — `includeRadar:true` is a strict superset of `false`). A
-round is cached only once *final* (every hole scored); the in-progress round is
-never cached. `refresh=true` on either endpoint busts the key.
+expiry, wrapped as `{fetchedAt, data}`; both `/api/shots` and `/api/putts` derive
+from that single entry (verified lossless — `includeRadar:true` is a strict
+superset of `false`). A round is cached only once *final* (every hole scored);
+the in-progress round is never cached. `refresh=true` on either endpoint busts
+the key. Derived stats (`/api/putts`'s per-hole rows and `shortestMissed`) are
+computed per request from that payload.
 
 Convenience JSON endpoints: `/api/schedule`, `/api/leaderboard`, `/api/shots`,
-`/api/putts`. Responses carry an `X-Cache: HIT|MISS` header.
+`/api/putts`. Responses carry `X-Cache: HIT|MISS` and `X-Data-Fetched-At` (ms,
+when the payload was captured from PGA — drives the UI's "data current as of").
 
 ## Layout
 
 ```
 pga/client.py            PGATourClient: query(), introspect(), shot_details(), key discovery
 pga/server.py            FastAPI app (Shot Explorer + GraphiQL + passthrough proxy)
-static/                  index.html (explorer) + graphiql.html
+static/                  index.html (explorer), graphiql.html, favicon.svg, fonts/
 start.sh / stop.sh       run/stop the web app
 scripts/dump_schema.py   dump the live schema -> schema/schema.{json,graphql}
 scripts/example_shots.py pull + print shot-by-shot data for a player/round

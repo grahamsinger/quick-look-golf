@@ -8,23 +8,46 @@ these are optional improvements.
   Note `pga/client.py` contains pgatour.com's *public* front-end API keys
   (scraped from their JS), not personal secrets — safe to publish.
 
-## Design refresh (comprehensive)
-The current UI is functional but visually generic — it reads as an
-AI-generated/template dashboard and lacks polish. The data-first look was a
-deliberate v1 tradeoff (get the numbers right and the interactions working
-first); the UI was not a focus. A future pass should give it a real visual
-identity, not just tweaks. Directions to consider:
-- Intentional **typography** (a real typeface, type scale, weights) instead of
-  system-font defaults.
-- A considered **color system** beyond the default dark-slate + green accent —
-  something that feels designed, with a proper neutral ramp and accent usage.
-- Custom **wordmark / favicon**; drop the emoji-in-buttons (🔗, ↻) for real icons.
-- More deliberate **spacing rhythm, density, and alignment** (the controls row,
-  cards, and tables currently look like default flexbox scaffolding).
-- Chart/table styling with a real data-viz sensibility (see the `dataviz` skill).
-- Consider a light theme / theme toggle, and responsive/mobile layout.
-This is UI-only — the data model, endpoints, and caching are solid and shouldn't
-need to change.
+## Design refresh — v1 shipped (Fairway theme, Jul 2026)
+Implemented the **"Fairway"** light editorial identity (replaces the generic
+dark-slate + green look):
+- Warm paper palette + deep pine ink + sand / flag-red accents. Score & status
+  colors validated for colorblind-safety (`dataviz` skill's validator).
+- Self-hosted **Fraunces** variable display serif (`static/fonts/`) for the
+  wordmark, hole numbers, and headings; system sans for UI; tabular figures for
+  data.
+- Custom **flag wordmark + favicon** (`static/favicon.svg`); tab title leads with
+  "Fairway". Real inline-SVG icons replace the emoji (🔗 / ↻ / ↗).
+- Daily first-putts view is now a **front/back scorecard** (Out | In side by
+  side) — all 18 holes visible without scrolling.
+- "Made" column renamed **Putts** (shows the putt count; green = 1-putt).
+- **Shot trails removed** — the abstract SVG plots were meaningless without the
+  course underneath. The view was reframed as **"Shots"** (shot-by-shot
+  play-by-play + TrackMan/ball-speed numbers, no plot).
+- **Dark mode** — a warm "clubhouse at dusk" palette (its own CVD-validated
+  steps, not a flip), a header sun/moon toggle, persisted to `localStorage`,
+  initialized from the system preference with a no-flash inline script. All tint
+  fills are tokenized (`--tint-good` etc.) so both themes share one ruleset.
+- **Round prev/next arrows** flanking the Round picker — step through a
+  tournament's days; disabled at the bounds (round 1 / the latest played round).
+- **5 shortest missed putts** — a daily-view panel of the shortest putts the
+  player *didn't* convert (server derives it in `/api/putts` as `shortestMissed`;
+  a "miss" = any green stroke that wasn't the holed one, length = the prior
+  stroke's `distanceRemaining`, so short 2nd/3rd putts rank correctly).
+- **"Data current as of" now reflects true capture time** — the server stamps
+  `fetchedAt` when it pulls from PGA and returns it (`X-Data-Fetched-At` header);
+  the browser shows that instead of its own fetch time, so a cached completed
+  round shows a stable capture time, not "now" on every load.
+- **"Holed from off green"** wording for chip-ins, capped so it wraps within a
+  fixed-width column and keeps the Front/Back nines symmetric.
+
+Still open (design):
+- **Shots view density** — make it more table-like; the per-hole cards show too
+  little at once. Needs a defined column set (hole, shot #, from → to, distance,
+  to-pin, ball/club speed, launch, spin, apex). Design TBD with the user.
+- **Player picker** — still a native `<select>`; give it the tournament-combobox
+  treatment (also listed under Possible improvements).
+- Responsive / mobile layout.
 
 ## Possible improvements
 - **Player typeahead** — the player dropdown is a plain `<select>` (144+ names);
@@ -37,8 +60,10 @@ need to change.
   (tends to feel noisy, so left off).
 - **Server-Timing** — the load-time indicator is browser wall-clock; could add a
   `Server-Timing` header to split "server N ms / total M ms".
-- **Hole diagrams** — overlay the real hole image (`holeDetails` "pickle" assets)
-  behind the shot-trail SVGs instead of an auto-fit blank plot.
+- **Spatial shot viz (needs the hole image)** — the abstract shot-trail SVG plots
+  were removed (meaningless without the course underneath). Any future spatial
+  view must overlay the real hole image (`holeDetails` "pickle" assets) behind the
+  shot paths; do not reintroduce bare plots without it.
 - **Live subscriptions** — the schema exposes `OnUpdate*` subscriptions over
   `orchestrator-ws.pgatour.com/graphql`; could stream live updates instead of
   manual refresh.
@@ -55,5 +80,6 @@ need to change.
 - Unofficial API, undocumented, governed by pgatour.com ToS — rate-limit, cache,
   don't hammer it. Keys rotate; `PGATourClient.discover_keys()` re-scrapes them.
 - Coordinates are `tourcast`/`enhanced` space (raw ShotLink x/y are redacted).
-- Bump `CACHE_VERSION` in `pga/server.py` only if the *cached raw payload* shape
-  changes — derived fields (e.g. `approachHad`) don't need it.
+- `CACHE_VERSION` is now `v2` — the cache wraps the payload as `{fetchedAt, data}`.
+  Bump it only if that stored shape changes; derived fields (`approachHad`,
+  `shortestMissed`) are computed per request and don't need a bump.
