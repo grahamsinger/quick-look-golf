@@ -11,11 +11,16 @@ export function shortestMissedPanel(list, opts = {}) {
   const missColor = (ft) => ft < 4 ? 'var(--flag)' : ft < 8 ? 'var(--sand)' : 'var(--ink-2)';
   const tiles = list.map(m => {
     const rtag = (opts.showRound && m.round) ? ` · R${m.round}` : '';
+    // the pill shows what the putt was FOR (the score it would have closed),
+    // not the score the hole ended at — that lives in the tooltip
+    const pill = m.forScore
+      ? `<span class="pill ${pillClass(m.forDiff)}" title="made ${esc(m.result)} after the miss">for ${esc(m.forScore)}</span>`
+      : `<span class="pill ${pillClass(m.scoreToPar)}">${esc(m.result)}</span>`;
     return `
-    <div class="misstile" title="Hole ${m.hole}${rtag}: missed a ${m.lengthFt} ft ${ordPutt(m.puttNumber)} putt · ${esc(m.result)}">
+    <div class="misstile" title="Hole ${m.hole}${rtag}: missed a ${m.lengthFt} ft ${ordPutt(m.puttNumber)} putt${m.forScore ? ` for ${esc(m.forScore)}` : ''} · made ${esc(m.result)}">
       <div class="mt-len" style="color:${missColor(m.lengthFt)}">${m.lengthFt}<span class="mt-unit">ft</span></div>
       <div class="mt-meta">Hole ${m.hole}${rtag} · ${ordPutt(m.puttNumber)} putt</div>
-      <div class="mt-res"><span class="pill ${pillClass(m.scoreToPar)}">${esc(m.result)}</span></div>
+      <div class="mt-res">${pill}</div>
     </div>`;
   }).join('');
   return `<div class="misspanel">

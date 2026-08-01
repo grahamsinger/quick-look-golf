@@ -56,14 +56,18 @@ def _parse_feet(dist: str | None) -> float | None:
     return round(total, 1)
 
 
+def _diff_label(diff: int) -> str:
+    if diff in _SCORE_NAMES:
+        return _SCORE_NAMES[diff]
+    return f"+{diff}" if diff > 0 else str(diff)
+
+
 def _score_result(score: str | None, par: int) -> tuple[int | None, str]:
     try:
         diff = int(score) - par
     except (TypeError, ValueError):
         return None, score or ""
-    if diff in _SCORE_NAMES:
-        return diff, _SCORE_NAMES[diff]
-    return diff, (f"+{diff}" if diff > 0 else str(diff))
+    return diff, _diff_label(diff)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -336,6 +340,9 @@ def putts(
             length_ft = _parse_feet(strokes[gi - 1].get("distanceRemaining"))
             if length_ft is None:
                 continue
+            # what the putt was FOR: holing the stroke at index gi would have
+            # closed the hole in gi + 1 strokes
+            for_diff = (gi + 1) - h["par"]
             missed_putts.append(
                 {
                     "hole": h["holeNumber"],
@@ -344,6 +351,8 @@ def putts(
                     "puttNumber": putt_no,
                     "result": result,
                     "scoreToPar": diff,
+                    "forScore": _diff_label(for_diff),
+                    "forDiff": for_diff,
                 }
             )
         # length of the putt that holed out (the made putt), for feet-of-putts-made
