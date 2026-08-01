@@ -79,9 +79,36 @@ dark-slate + green look):
   `esc()` on all API strings hitting innerHTML; round menu keyboard nav;
   dead `radar` param removed.
 
+- **Proximity vs expectation (Aug 2026)** — the first-putts views now judge each
+  shot on its own curve instead of conflating approach play with chipping:
+  - "Had" classifies as **approach** (full shot, >30y) vs **greenside**
+    (chip/pitch — ShotLink reports those in feet); greenside hads render in
+    sand so the two are tellable at a glance.
+  - The proximity number's color/glyph = **vs tour-average proximity from that
+    distance & lie** (static baseline table in the client: distance bands ×
+    fairway/rough/sand multipliers): ▴ = well inside the average (≤0.6×),
+    ▾ = well outside (≥1.8×). Tooltips show the expected number. This replaced
+    score-coloring the number (score lives in the Result pill / cell tooltip) —
+    a 46-footer after a 285y approach no longer glows green just because the
+    eagle putt dropped, and a 2.4-from-107y lights up even on a par.
+  - Split averages: "avg 1st putt after approaches X ft · greenside Y ft" in
+    the daily summary line and as a strip on the all-rounds view.
+  - Contrast fix: quality ink uses its own tokens (`--prox-hot/cold`, deeper
+    than `--good` in light, brighter in dark) + a ▴/▾ glyph so the signal is
+    never color-alone — resolves green-number-on-green-tint illegibility.
+  - Baselines are approximations; tune `APPR_BANDS`/lie multipliers in
+    `static/index.html` if they feel off. Tier 3 (per-round "strokes gained
+    vs expected" tallies from expected-putts tables) is a possible follow-on.
+- **Round arrows walk the picker order (Aug 2026)** — ‹ › now step
+  R1 → … → Rmax → All rounds (when the view offers it), so All rounds is
+  reachable by arrow; ends disable at the sequence bounds.
+
 Still open (design):
 - Responsive / mobile layout.
 - Player picker refinements as they come up (density, maybe headshots?).
+- **Strokes-gained-style tallies (tier 3)** — per-round "hit it X ft better
+  than expected per approach · gained ~Y putts vs expected" using embeddable
+  expected-putts baselines; do after living with the ▴/▾ coloring for a while.
 
 ## Possible improvements
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*

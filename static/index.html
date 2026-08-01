@@ -41,6 +41,8 @@
       --flag-tint: #F4E2DB; --turf: #E7EDD9;
       /* score-to-par text (WCAG-safe on paper) */
       --good: #1E6B3F; --neutral: #4B5A50; --warn: #8A6414; --bad: #A5301F;
+      /* proximity-vs-expectation ink (deeper than --good so it reads on the green tint) */
+      --prox-hot: #17593A; --prox-cold: #A5301F;
       /* focus ring + status tint fills (tokenized so dark mode can override) */
       --focus-ring: rgba(28,74,52,.16);
       --tint-good: rgba(47,125,79,.09); --tint-good-2: rgba(47,125,79,.16);
@@ -60,6 +62,7 @@
       --sand: #D8B45E; --sand-2: #C6A468;
       --flag: #E56C52; --flag-2: #EC8370; --flag-tint: #2C1C17; --turf: #1B2416;
       --good: #46B873; --neutral: #B4B4A0; --warn: #F0CB4A; --bad: #EC6247;
+      --prox-hot: #55C689; --prox-cold: #EC6247;
       --focus-ring: rgba(79,180,119,.26);
       --tint-good: rgba(70,184,115,.15); --tint-good-2: rgba(70,184,115,.24);
       --tint-bad: rgba(236,98,71,.15); --tint-bad-2: rgba(236,98,71,.24);
@@ -327,9 +330,12 @@
     table.putts .dist { font-variant-numeric: tabular-nums; }
     table.putts td.hole { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; font-size: 15px; color: var(--ink); }
     table.putts tbody tr.made { background: var(--tint-good); }
-    table.putts tbody tr.made td.dist { color: var(--good); font-weight: 640; }
     table.putts tbody tr.threeputt { background: var(--tint-bad); }
-    table.putts tbody tr.threeputt td.dist { color: var(--bad); font-weight: 640; }
+    /* proximity vs tour-average expectation (color never alone: paired with ▴/▾) */
+    .q-hot { color: var(--prox-hot); font-weight: 700; }
+    .q-cold { color: var(--prox-cold); font-weight: 640; }
+    .qg { font-size: 9.5px; vertical-align: 1.5px; margin-left: 1px; }
+    .hgs { color: var(--sand); }  /* greenside-origin "had" (chip/pitch, not a full approach) */
     .made-yes { color: var(--good); } .made-no { color: var(--bad); font-weight: 640; } .made-na { color: var(--ink-3); }
     .putts-cnt { color: var(--ink-2); font-variant-numeric: tabular-nums; }
     .pill { display: inline-flex; align-items: center; padding: 2px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 650; letter-spacing: .01em; }
@@ -717,13 +723,58 @@
     }
 
     // ---- first-putts view -----------------------------------------------
-    function resultColor(diff) {
-      if (diff == null) return 'var(--ink-3)';
-      if (diff < 0) return 'var(--good)';    // birdie or better
-      if (diff === 0) return 'var(--neutral)'; // par
-      if (diff === 1) return 'var(--warn)';  // bogey
-      return 'var(--bad)';                   // double+
+    // ---- proximity vs expectation: judge each shot on its own curve -------
+    // "2.4 ft from 107y" is elite; "2.3 ft from a 45′ chip" is merely good. A
+    // shot's proximity is scored against the tour-average from that distance
+    // and lie, not against the hole score.
+    // Parse a "had" string → feet + kind (approach = full shot; greenside =
+    // chip/pitch — ShotLink reports those in feet; ≤30y follows the SG line).
+    function parseHad(str) {
+      if (!str) return null;
+      let m = str.match(/([\d.]+)\s*yds/);
+      if (m) { const y = parseFloat(m[1]); return { ft: y * 3, yds: y, kind: y > 30 ? 'approach' : 'greenside' }; }
+      m = str.match(/(\d+)\s*ft/);
+      const inch = str.match(/(\d+)\s*in/);
+      if (m || inch) { const f = (m ? +m[1] : 0) + (inch ? +inch[1] / 12 : 0); return { ft: f, yds: f / 3, kind: 'greenside' }; }
+      return null;
     }
+    // static tour-average first-putt proximity (ft) by start distance + lie
+    const APPR_BANDS = [[75, 16.5], [100, 18], [125, 20.5], [150, 23.5], [175, 27], [200, 32], [225, 38], [250, 45], [Infinity, 55]];
+    function expectedProx(had, fromLoc) {
+      if (!had) return null;
+      const lie = (fromLoc || '').toLowerCase();
+      if (had.kind === 'approach') {
+        const base = APPR_BANDS.find(([max]) => had.yds <= max)[1];
+        const mult = /rough|intermediate/.test(lie) ? 1.35 : /bunker|sand/.test(lie) ? 1.45 : 1;
+        return Math.round(base * mult * 10) / 10;
+      }
+      const base = had.ft <= 30 ? 5 : had.ft <= 60 ? 7.5 : had.ft <= 90 ? 10 : 12.5;
+      return base + (/bunker|sand/.test(lie) ? 2.5 : /rough|intermediate/.test(lie) ? 1.5 : 0);
+    }
+    function proxQual(hadStr, fromLoc, actualFt) {
+      const had = parseHad(hadStr);
+      const exp = expectedProx(had, fromLoc);
+      const kind = had ? had.kind : null;
+      if (exp == null || actualFt == null) return { cls: '', glyph: '', exp: null, kind };
+      const r = actualFt / exp;
+      if (r <= 0.6) return { cls: 'q-hot', glyph: '▴', exp, kind };
+      if (r >= 1.8) return { cls: 'q-cold', glyph: '▾', exp, kind };
+      return { cls: '', glyph: '', exp, kind };
+    }
+    // split average first-putt length by what set it up (approach vs greenside)
+    function proxSplit(rows) {
+      const acc = { approach: [], greenside: [] };
+      rows.forEach(r => {
+        if (r.firstPuttFt == null) return;
+        const had = parseHad(r.approachHad);
+        if (had) acc[had.kind].push(r.firstPuttFt);
+      });
+      const avg = (x) => x.length ? Math.round(x.reduce((s, v) => s + v, 0) / x.length * 10) / 10 : null;
+      return { appr: avg(acc.approach), apprN: acc.approach.length, gs: avg(acc.greenside), gsN: acc.greenside.length };
+    }
+    const proxSplitLabel = (sp) =>
+      [sp.appr != null ? `after approaches <b>${sp.appr} ft</b>` : '',
+       sp.gs != null ? `greenside <b>${sp.gs} ft</b>` : ''].filter(Boolean).join(' · ');
     function pillClass(diff) {
       if (diff == null) return 'par';
       if (diff < 0) return 'birdie';
@@ -765,10 +816,12 @@
       const rowHtml = (r) => {
         const isStart = r.hole === startHole;
         const cls = r.putts === 1 ? 'made' : r.putts >= 3 ? 'threeputt' : '';
+        const q = proxQual(r.approachHad, r.approachFrom, r.firstPuttFt);
         const had = r.approachHad
-          ? `<span title="hit it ${esc(r.approachDist || '?')} from ${esc(r.approachFrom || '?')}">${esc(r.approachHad)}</span>`
+          ? `<span class="${q.kind === 'greenside' ? 'hgs' : ''}" title="${q.kind === 'greenside' ? 'greenside shot (chip/pitch) · ' : ''}hit it ${esc(r.approachDist || '?')} from ${esc(r.approachFrom || '?')}">${esc(r.approachHad)}</span>`
           : '<span class="made-na">—</span>';
-        const prox = r.firstPuttFt != null ? r.firstPuttFt + ' ft'
+        const prox = r.firstPuttFt != null
+          ? `<span class="${q.cls}"${q.exp != null ? ` title="tour avg ≈ ${q.exp} ft from there"` : ''}>${r.firstPuttFt} ft${q.glyph ? `<span class="qg">${q.glyph}</span>` : ''}</span>`
           : '<span class="made-na" title="holed from off the green — no first putt to measure">holed out</span>';
         const puttsCell = r.holedOffGreen
           ? '<span class="made-na" title="holed from off the green — no putt on this hole">—</span>'
@@ -791,10 +844,12 @@
         </table></div>` : '';
       const front = nine('Front', rows.filter(r => r.hole <= 9));
       const back = nine('Back', rows.filter(r => r.hole > 9));
+      const sp = proxSplit(d.holes);
+      const spTxt = proxSplitLabel(sp);
       $('out').innerHTML =
-        `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts</span></div>
+        `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts${spTxt ? ` · avg 1st putt ${spTxt}` : ''}</span></div>
          ${shortestMissedPanel((d.shortestMissed || []).slice(0, 5))}
-         <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Putts</b> = putts taken on the hole · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
+         <div class="caphint"><b>Had</b> = distance to the pin before the shot (<b class="hgs">sand</b> = greenside chip/pitch) · <b>Proximity</b> = how close it finished, judged against the tour average from that distance &amp; lie: <span class="q-hot">▴ beat it</span> / <span class="q-cold">▾ well outside</span> · <b>Putts</b> = putts taken · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
          <div class="card scorecard">${front}${back}</div>`;
     }
 
@@ -826,11 +881,13 @@
         if (!scored(row)) return '<td class="mx"></td>';           // not played yet
         if (row.firstPuttFt == null) return '<td class="mx"><span class="og" title="holed off green">–</span></td>';
         const cls = row.putts === 1 ? 'made' : row.putts >= 3 ? 'threeputt' : '';
+        const q = proxQual(row.approachHad, row.approachFrom, row.firstPuttFt);
         const hadTip = row.approachHad ? `had ${row.approachHad} → ` : '';
-        const tip = `Hole ${row.hole} · ${hadTip}${row.firstPuttFt} ft${row.putts === 1 ? ' · made' : ` · ${row.putts}-putt`} · ${row.result}`;
+        const expTip = q.exp != null ? ` · tour avg ≈ ${q.exp} ft from there` : '';
+        const tip = `Hole ${row.hole} · ${hadTip}${row.firstPuttFt} ft${row.putts === 1 ? ' · made' : ` · ${row.putts}-putt`} · ${row.result}${expTip}`;
         return `<td class="mx ${cls}" title="${esc(tip)}">
-          <span class="mput" style="color:${resultColor(row.scoreToPar)}">${row.firstPuttFt}</span>
-          <span class="mappr">${esc(approachShort(row.approachHad))}</span>
+          <span class="mput ${q.cls}">${row.firstPuttFt}${q.glyph ? `<span class="qg">${q.glyph}</span>` : ''}</span>
+          <span class="mappr${q.kind === 'greenside' ? ' hgs' : ''}">${esc(approachShort(row.approachHad))}</span>
         </td>`;
       };
       // one nine's worth of cells for a given hole (empty if that hole is absent)
@@ -854,12 +911,11 @@
           <span class="ksw made">1</span> 1-putt
           <span class="ksw threeputt">3+</span> 3-putt or worse</div>
         <div class="kgrp"><span class="kt">Per cell</span>
-          <span class="knum">12.2</span> proximity ft <span class="mappr" style="display:inline">/ 117y</span> had</div>
-        <div class="kgrp"><span class="kt">Number = score</span>
-          <span class="knum" style="color:var(--good)">Birdie+</span>
-          <span class="knum" style="color:var(--neutral)">Par</span>
-          <span class="knum" style="color:var(--warn)">Bogey</span>
-          <span class="knum" style="color:var(--bad)">Dbl+</span></div>
+          <span class="knum">12.2</span> proximity ft <span class="mappr" style="display:inline">/ 117y</span> had
+          (<span class="hgs">51'</span> = greenside chip)</div>
+        <div class="kgrp"><span class="kt">vs tour avg from there</span>
+          <span class="q-hot">2.4<span class="qg">▴</span></span> beat it
+          <span class="q-cold">44<span class="qg">▾</span></span> well outside</div>
         <div class="kgrp"><span class="og">–</span> holed off green</div>
       </div>`;
       // tournament putting stats: feet of putts made (per round + total) and the
@@ -870,9 +926,13 @@
       const allMissed = played.flatMap(r => (byRound[r].shortestMissed || []).map(m => ({ ...m, round: r })));
       allMissed.sort((a, b) => a.lengthFt - b.lengthFt || a.hole - b.hole);
       const missPanel = shortestMissedPanel(allMissed.slice(0, 5), { title: '5 shortest putts missed', sub: '— across the tournament', showRound: true });
+      const sp = proxSplit(played.flatMap(r => byRound[r].holes.filter(scored)));
+      const spTxt = proxSplitLabel(sp);
+      const proxStrip = spTxt ? `<div class="madestrip"><span class="ms-lbl">Avg first putt</span><span class="ms-item">${spTxt}</span></div>` : '';
       $('out').innerHTML =
         `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">All rounds · first-putt length (ft)</span></div>
          ${madeStrip}
+         ${proxStrip}
          ${missPanel}
          ${key}
          <div class="card"><table class="putts"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
@@ -1022,19 +1082,24 @@
     }
 
     // --- round prev/next stepping ------------------------------------------
+    // The arrows walk the picker's own option order — R1 → … → Rmax → All
+    // rounds (when the view offers it) — so "All rounds" is one more › past
+    // the last round, not an unreachable dead end.
     const maxRound = () => Number(state.currentRound) || 4;
+    const roundOrder = () => [...$('round').options].map(o => o.value);
     function updateRoundNav() {
-      const v = $('round').value, mx = maxRound();
+      const order = roundOrder();
+      const i = order.indexOf($('round').value);
       const prev = document.querySelector('.rnav[data-step="-1"]');
       const next = document.querySelector('.rnav[data-step="1"]');
-      if (prev) prev.disabled = v !== 'all' && Number(v) <= 1;
-      if (next) next.disabled = v !== 'all' && Number(v) >= mx;
+      if (prev) prev.disabled = i <= 0;
+      if (next) next.disabled = i < 0 || i >= order.length - 1;
     }
     function stepRound(step) {
-      const v = $('round').value, mx = maxRound();
-      const target = v === 'all' ? (step > 0 ? 1 : mx) : Math.min(mx, Math.max(1, Number(v) + step));
-      if (String(target) === v) return;
-      $('round').value = String(target);
+      const order = roundOrder();
+      const target = order[order.indexOf($('round').value) + step];
+      if (!target) return;
+      $('round').value = target;
       syncRoundBtn();
       updateRoundNav();
       loadShots();
