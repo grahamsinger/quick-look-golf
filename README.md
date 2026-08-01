@@ -34,9 +34,13 @@ theme** and a **dark mode** — sun/moon toggle (top right) that remembers your
 choice and follows the system default. Self-hosted Fraunces display serif.
 
 - **Controls:** season, a **searchable tournament combobox** (dates + a "LIVE"
-  badge on the in-progress event; opens *sticky to the current selection*),
-  player (defaults to the leader), and round — **‹ ›** arrows step through a
-  tournament's days, or pick **All rounds** (the default).
+  badge on the in-progress event; opens *sticky to the current selection*), a
+  **leaderboard player picker** (the dropdown is a mini leaderboard: a position
+  rail with one badge per tie group, player chips with colored scores, a
+  search-the-field typeahead, and a dimmed missed-cut section; defaults to the
+  leader), and round — **‹ ›** arrows step through a tournament's days, or pick
+  **All rounds** (the default). Rounds a player didn't play fall back to their
+  latest round with data.
 - **First putts** (default view):
   - *Single round* — a **Front | Back scorecard** (both nines side by side, all
     18 holes at once): **Hole · Had · Proximity · Putts · Result**, where *Had* =
@@ -67,9 +71,13 @@ Completed rounds are immutable, so the server caches the **raw radar-on
 `shotDetailsV3` payload once per (tournament, player, round)** in Redis with no
 expiry, wrapped as `{fetchedAt, data}`; both `/api/shots` and `/api/putts` derive
 from that single entry (verified lossless — `includeRadar:true` is a strict
-superset of `false`). A round is cached only once *final* (every hole scored);
-the in-progress round is never cached. `refresh=true` on either endpoint busts
-the key. Derived stats (`/api/putts`'s per-hole rows and `shortestMissed`) are
+superset of `false`). A round is cached with no expiry only once *final* (every
+hole scored); an **in-progress round gets a 30-second TTL** instead, so live
+view-flipping reuses one capture without going stale. A **per-key fetch lock**
+coalesces concurrent identical requests (the UI loads shots+putts in parallel —
+only one upstream fetch happens). `refresh=true` on either endpoint busts the
+key. If the scraped API key rotates, the client **re-scrapes and retries
+automatically** on an auth failure. Derived stats (`/api/putts`'s per-hole rows and `shortestMissed`) are
 computed per request from that payload.
 
 Convenience JSON endpoints: `/api/schedule`, `/api/leaderboard`, `/api/shots`,

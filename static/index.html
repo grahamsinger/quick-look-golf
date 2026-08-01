@@ -137,7 +137,36 @@
     .select-wrap { position: relative; display: flex; align-items: center; }
     .select-wrap select { appearance: none; -webkit-appearance: none; padding-right: 32px; width: 100%; }
     .select-wrap .chev { position: absolute; right: 11px; color: var(--ink-3); pointer-events: none; }
-    .field-player .select-wrap { min-width: 210px; } .field-player select { max-width: 340px; }
+    /* player picker: a leaderboard panel — chips ordered by position, ties grouped */
+    .player-combo { position: relative; min-width: 235px; }
+    .player-btn { max-width: 340px; }
+    .player-btn #playerBtnLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .player-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+      background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);
+      box-shadow: var(--shadow); padding: 10px; width: min(720px, calc(100vw - 48px)); }
+    .pfilter-wrap { margin-bottom: 10px; }
+    .pfilter-wrap #playerFilter { width: 100%; padding-left: 33px; height: 36px; }
+    /* two-column grid: a right-aligned position rail | the tie group's chips */
+    .player-board { max-height: 380px; overflow-y: auto; display: grid;
+      grid-template-columns: max-content 1fr; align-items: start; gap: 9px 12px; padding: 2px; }
+    .pgchips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+    .pgpos { font-size: 10.5px; font-weight: 800; color: var(--sand); letter-spacing: .02em;
+      font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; padding-top: 7px; }
+    .pgpos.out, .pgchips.out .pchip { opacity: .6; }
+    .pgpos.out { color: var(--ink-3); }
+    .pchip { display: inline-flex; align-items: baseline; gap: 7px; background: var(--card-2); color: var(--ink);
+      border: 1px solid var(--line); border-radius: 18px; padding: 4px 12px 5px; font-size: 12.5px;
+      font-family: inherit; cursor: pointer; line-height: 1.35; }
+    .pchip:hover { border-color: var(--pine); background: var(--card); }
+    .pchip .pscore { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink-3); font-weight: 640; }
+    .pchip .pscore.under { color: var(--good); } .pchip .pscore.over { color: var(--bad); }
+    .pchip.sel { background: var(--pine); border-color: var(--pine); color: #F4EFE2; }
+    .pchip.sel .pscore, .pchip.sel .pscore.under, .pchip.sel .pscore.over { color: rgba(244,239,226,.8); }
+    .pchip.active { outline: 2px solid var(--pine); outline-offset: 1px; }
+    .pcut { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; color: var(--ink-3);
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; margin: 6px 0 0; }
+    .pcut::before, .pcut::after { content: ""; height: 1px; background: var(--line-2); flex: 1; }
+    .pempty { grid-column: 1 / -1; color: var(--ink-3); padding: 6px; }
     /* round picker: custom styled dropdown (matches the tournament combobox) */
     .round-combo { position: relative; min-width: 138px; }
     .round-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
@@ -364,10 +393,20 @@
       <ul id="tournList" class="combo-list" role="listbox" hidden></ul>
     </div>
     <div class="field field-player">
-      <label for="player">Player</label>
-      <div class="select-wrap">
-        <select id="player"><option>pick a tournament</option></select>
-        <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+      <label for="playerBtn">Player</label>
+      <div class="player-combo">
+        <select id="player" hidden><option value="">pick a tournament</option></select>
+        <button type="button" id="playerBtn" class="round-btn player-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="playerPanel">
+          <span id="playerBtnLabel">pick a tournament</span>
+          <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+        </button>
+        <div id="playerPanel" class="player-panel" hidden>
+          <div class="input-wrap pfilter-wrap">
+            <svg class="ic search-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4"/><path d="M10 10 13.6 13.6"/></svg>
+            <input type="text" id="playerFilter" autocomplete="off" spellcheck="false" placeholder="Search the field…" />
+          </div>
+          <div id="playerBoard" class="player-board" role="listbox"></div>
+        </div>
       </div>
     </div>
     <div class="field field-round">
@@ -416,6 +455,8 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+    // escape API-sourced strings before they hit innerHTML / attributes
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const status = (msg, err = false) => { const s = $('status'); s.textContent = msg || ''; s.className = err ? 'err' : ''; };
     const api = async (path) => { const r = await fetch(path); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json(); };
 
@@ -472,7 +513,7 @@
             const live = t.tournamentStatus === 'IN_PROGRESS';
             const cls = [t.id === selId ? 'sel' : '', live ? 'live' : ''].filter(Boolean).join(' ');
             const badge = live ? '<span class="live-badge">LIVE</span>' : '';
-            return `<li role="option" data-id="${t.id}" class="${cls}"><span class="tlabel">${tournLabel(t)}</span>${badge}</li>`;
+            return `<li role="option" data-id="${t.id}" class="${cls}"><span class="tlabel">${esc(tournLabel(t))}</span>${badge}</li>`;
           }).join('')
         : '<li class="combo-empty">No matches</li>';
       list.hidden = false;
@@ -542,7 +583,7 @@
 
     function selectPlayer(id) {
       const sel = $('player');
-      if (id && [...sel.options].some(o => o.value === id)) { sel.value = id; return true; }
+      if (id && [...sel.options].some(o => o.value === id)) { sel.value = id; syncPlayerBtn(); return true; }
       return false;
     }
     // Reflect the current selection in the URL so reloads restore it and links are shareable.
@@ -574,6 +615,7 @@
       const sel = $('player'); sel.innerHTML = '<option>loading…</option>';
       try {
         const data = await api(`/api/leaderboard?tournamentId=${encodeURIComponent(tid)}`);
+        state.players = data.players;
         sel.innerHTML = '';
         data.players.forEach(p => {
           const o = document.createElement('option');
@@ -585,8 +627,9 @@
         // Shot-trails default; First putts stays on "All rounds").
         state.currentRound = data.currentRound || null;
         updateRoundOptions();
+        syncPlayerBtn();
         status(`${data.players.length} players in the field.`);
-      } catch (e) { sel.innerHTML = '<option>—</option>'; status('Field failed: ' + e.message, true); }
+      } catch (e) { state.players = []; sel.innerHTML = '<option value="">—</option>'; syncPlayerBtn(); status('Field failed: ' + e.message, true); }
     }
 
     // ---- shots comparison matrix ----------------------------------------
@@ -627,14 +670,14 @@
       const p3 = (i === 0 && par === 3) ? '<sup class="p3" title="par-3 tee shot — an iron/hybrid, not a drive">P3</sup>' : '';
       const tip = [`#${s.strokeNumber}`, `${s.fromLocation || '?'} → ${isHoled ? 'holed' : (s.toLocation || '?')}`,
         s.distance ? `${s.distance} shot` : '', bs ? `ball ${s.radarData.ballSpeed} mph` : '', s.playByPlay || '']
-        .filter(Boolean).join(' · ').replace(/"/g, '&quot;');
-      return `<td class="scell" title="${tip}">
-        <span class="sc-v">${primary}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}</span>
-        <span class="sc-r r-${cls}">${res}</span>
+        .filter(Boolean).join(' · ');
+      return `<td class="scell" title="${esc(tip)}">
+        <span class="sc-v">${esc(primary)}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}</span>
+        <span class="sc-r r-${cls}">${esc(res)}</span>
       </td>`;
     }
 
-    const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], view: 'putts' };
+    const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], players: [], view: 'putts' };
     const playerLabel = () => $('player').selectedOptions[0]?.textContent.trim() || $('player').value;
     // strip a leading "pos  " prefix off the option label for the editorial heading
     const playerName = () => playerLabel().replace(/^\S+\s+/, '').replace(/\s+\([^)]*\)\s*$/, '') || playerLabel();
@@ -661,7 +704,7 @@
         </tr>`;
       }).join('');
       $('out').innerHTML =
-        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b>${startHole !== 1 ? ` · started hole ${startHole}` : ''} · shot-by-shot</span></div>
+        `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole !== 1 ? ` · started hole ${startHole}` : ''} · shot-by-shot</span></div>
          <div class="caphint">Big number = <b>ball speed</b> (mph) on full swings, otherwise the shot distance / putt length · below it = where it finished (<b class="rg-good">fairway · green</b> / <b class="rg-warn">rough</b> / <b class="rg-bad">sand · penalty</b>) · <sup class="p3">P3</sup> = par-3 tee shot · read a column down to compare (e.g. every tee-shot ball speed)</div>
          <div class="card shotmatrix"><table class="shots">
            <thead><tr><th>Hole</th><th class="spar-h">Par</th>${shotHdrs}<th>Score</th></tr></thead>
@@ -698,10 +741,10 @@
       const tiles = list.map(m => {
         const rtag = (opts.showRound && m.round) ? ` · R${m.round}` : '';
         return `
-        <div class="misstile" title="Hole ${m.hole}${rtag}: missed a ${m.lengthFt} ft ${ordPutt(m.puttNumber)} putt · ${m.result}">
+        <div class="misstile" title="Hole ${m.hole}${rtag}: missed a ${m.lengthFt} ft ${ordPutt(m.puttNumber)} putt · ${esc(m.result)}">
           <div class="mt-len" style="color:${missColor(m.lengthFt)}">${m.lengthFt}<span class="mt-unit">ft</span></div>
           <div class="mt-meta">Hole ${m.hole}${rtag} · ${ordPutt(m.puttNumber)} putt</div>
-          <div class="mt-res"><span class="pill ${pillClass(m.scoreToPar)}">${m.result}</span></div>
+          <div class="mt-res"><span class="pill ${pillClass(m.scoreToPar)}">${esc(m.result)}</span></div>
         </div>`;
       }).join('');
       return `<div class="misspanel">
@@ -719,7 +762,7 @@
         const isStart = r.hole === startHole;
         const cls = r.putts === 1 ? 'made' : r.putts >= 3 ? 'threeputt' : '';
         const had = r.approachHad
-          ? `<span title="hit it ${r.approachDist || '?'} from ${r.approachFrom || '?'}">${r.approachHad}</span>`
+          ? `<span title="hit it ${esc(r.approachDist || '?')} from ${esc(r.approachFrom || '?')}">${esc(r.approachHad)}</span>`
           : '<span class="made-na">—</span>';
         const prox = r.firstPuttFt != null ? r.firstPuttFt + ' ft'
           : '<span class="made-na" title="holed from off the green — no first putt to measure">holed out</span>';
@@ -731,7 +774,7 @@
           <td class="num">${had}</td>
           <td class="num dist">${prox}</td>
           <td class="num">${puttsCell}</td>
-          <td><span class="pill ${pillClass(r.scoreToPar)}">${r.result}</span></td>
+          <td><span class="pill ${pillClass(r.scoreToPar)}">${esc(r.result)}</span></td>
         </tr>`;
       };
       const nine = (label, rws) => rws.length ? `<div class="nine">
@@ -745,7 +788,7 @@
       const front = nine('Front', rows.filter(r => r.hole <= 9));
       const back = nine('Back', rows.filter(r => r.hole > 9));
       $('out').innerHTML =
-        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts</span></div>
+        `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts</span></div>
          ${shortestMissedPanel((d.shortestMissed || []).slice(0, 5))}
          <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Putts</b> = putts taken on the hole · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
          <div class="card scorecard">${front}${back}</div>`;
@@ -781,9 +824,9 @@
         const cls = row.putts === 1 ? 'made' : row.putts >= 3 ? 'threeputt' : '';
         const hadTip = row.approachHad ? `had ${row.approachHad} → ` : '';
         const tip = `Hole ${row.hole} · ${hadTip}${row.firstPuttFt} ft${row.putts === 1 ? ' · made' : ` · ${row.putts}-putt`} · ${row.result}`;
-        return `<td class="mx ${cls}" title="${tip}">
+        return `<td class="mx ${cls}" title="${esc(tip)}">
           <span class="mput" style="color:${resultColor(row.scoreToPar)}">${row.firstPuttFt}</span>
-          <span class="mappr">${approachShort(row.approachHad)}</span>
+          <span class="mappr">${esc(approachShort(row.approachHad))}</span>
         </td>`;
       };
       // one nine's worth of cells for a given hole (empty if that hole is absent)
@@ -824,7 +867,7 @@
       allMissed.sort((a, b) => a.lengthFt - b.lengthFt || a.hole - b.hole);
       const missPanel = shortestMissedPanel(allMissed.slice(0, 5), { title: '5 shortest putts missed', sub: '— across the tournament', showRound: true });
       $('out').innerHTML =
-        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">All rounds · first-putt length (ft)</span></div>
+        `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">All rounds · first-putt length (ft)</span></div>
          ${madeStrip}
          ${missPanel}
          ${key}
@@ -859,7 +902,7 @@
       if (!force && cacheable && dataCache.has(key)) return { ...dataCache.get(key), source: 'client' };
       const refreshQ = force ? '&refresh=true' : '';  // also bust the server (Redis) entry
       const url = kind === 'shots'
-        ? `/api/shots?tournamentId=${tid}&playerId=${pid}&round=${round}&radar=true${refreshQ}`
+        ? `/api/shots?tournamentId=${tid}&playerId=${pid}&round=${round}${refreshQ}`
         : `/api/putts?tournamentId=${tid}&playerId=${pid}&round=${round}${refreshQ}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
@@ -902,10 +945,15 @@
       el.innerHTML = ts ? asOfBar(ts) : '';
     }
 
+    // Monotonic load counter: round-stepping / picker clicks can overlap, and a
+    // slower older response must never paint over a newer one. Each load takes a
+    // ticket; anything that returns to a stale ticket bails before touching state.
+    let loadSeq = 0;
     async function loadShots(opts = {}) {
       const force = !!opts.force;
       const tid = $('tourn').value, pid = $('player').value, rnd = $('round').value;
       if (!tid || !pid) { status('Pick a tournament and player first.', true); return; }
+      const seq = ++loadSeq;
       $('go').disabled = true; status(force ? 'Refreshing…' : 'Loading…'); $('out').innerHTML = '';
       const t0 = performance.now();
       const setLoadMeta = (sources) => {
@@ -919,6 +967,7 @@
           const rounds = [1, 2, 3, 4].filter(r => r <= maxRound);
           const entries = await Promise.all(rounds.map(r =>
             fetchRound('putts', tid, pid, r, force).catch(() => null)));
+          if (seq !== loadSeq) return;
           state.puttsAll = {}; state.puttsAllTs = {};
           rounds.forEach((r, i) => {
             state.puttsAll[r] = entries[i] ? entries[i].data : null;
@@ -933,18 +982,23 @@
             fetchRound('shots', tid, pid, useRound, force),
             fetchRound('putts', tid, pid, useRound, force),
           ]);
+          if (seq !== loadSeq) return;
           if (!(pE.data.holes || []).some(scoredHole)) {
             // no data for this player in the chosen round — drop to their last round with data
-            const all = await Promise.all([1, 2, 3, 4].map(r =>
+            const probe = [1, 2, 3, 4].filter(r => r <= maxRound());
+            const all = await Promise.all(probe.map(r =>
               fetchRound('putts', tid, pid, r, force).catch(() => null)));
-            const latest = [4, 3, 2, 1].find(r => all[r - 1] && (all[r - 1].data.holes || []).some(scoredHole));
+            if (seq !== loadSeq) return;
+            const latest = [...probe].reverse().find(r => all[probe.indexOf(r)] && (all[probe.indexOf(r)].data.holes || []).some(scoredHole));
             if (latest && String(latest) !== String(useRound)) {
               useRound = String(latest);
               $('round').value = useRound;
+              syncRoundBtn();  // keep the styled button label in step with the fallback
               [sE, pE] = await Promise.all([
                 fetchRound('shots', tid, pid, useRound, force),
                 fetchRound('putts', tid, pid, useRound, force),
               ]);
+              if (seq !== loadSeq) return;
             }
           }
           state.shots = sE.data; state.putts = pE.data;
@@ -955,9 +1009,12 @@
         }
         syncUrl();
       } catch (e) {
+        if (seq !== loadSeq) return;
         state.shots = state.putts = state.puttsAll = null;
         status('Load failed: ' + e.message + '  (player may not have played this round)', true);
-      } finally { $('go').disabled = false; updateRoundNav(); }
+      } finally {
+        if (seq === loadSeq) { $('go').disabled = false; updateRoundNav(); }
+      }
     }
 
     // --- round prev/next stepping ------------------------------------------
@@ -1001,8 +1058,21 @@
       $('roundMenu').innerHTML = [...$('round').options].map(o =>
         `<li role="option" data-val="${o.value}" class="${o.value === sel ? 'sel' : ''}" aria-selected="${o.value === sel}">${o.textContent}</li>`).join('');
     }
-    function closeRoundMenu() { $('roundMenu').hidden = true; $('roundBtn').setAttribute('aria-expanded', 'false'); }
-    function openRoundMenu() { renderRoundMenu(); $('roundMenu').hidden = false; $('roundBtn').setAttribute('aria-expanded', 'true'); }
+    function closeRoundMenu() { $('roundMenu').hidden = true; $('roundBtn').setAttribute('aria-expanded', 'false'); roundActive = -1; }
+    function openRoundMenu() {
+      renderRoundMenu(); $('roundMenu').hidden = false; $('roundBtn').setAttribute('aria-expanded', 'true');
+      roundActive = -1;
+      const idx = [...$('round').options].findIndex(o => o.value === $('round').value);
+      if (idx >= 0) setActiveRound(idx);
+    }
+    let roundActive = -1;
+    function setActiveRound(i) {
+      const items = [...$('roundMenu').querySelectorAll('li[role=option]')];
+      if (!items.length) return;
+      roundActive = Math.max(0, Math.min(i, items.length - 1));
+      items.forEach((el, idx) => el.classList.toggle('active', idx === roundActive));
+      items[roundActive].scrollIntoView({ block: 'nearest' });
+    }
     function selectRound(v) {
       closeRoundMenu();
       if (v === $('round').value) return;
@@ -1014,8 +1084,93 @@
     function setupRoundCombo() {
       $('roundBtn').addEventListener('click', () => { $('roundMenu').hidden ? openRoundMenu() : closeRoundMenu(); });
       $('roundMenu').addEventListener('click', (e) => { const li = e.target.closest('li[role=option]'); if (li) selectRound(li.dataset.val); });
-      $('roundBtn').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRoundMenu(); });
+      $('roundMenu').addEventListener('mousemove', (e) => {
+        const li = e.target.closest('li[role=option]');
+        if (li) setActiveRound([...$('roundMenu').querySelectorAll('li[role=option]')].indexOf(li));
+      });
+      $('roundBtn').addEventListener('keydown', (e) => {
+        const open = !$('roundMenu').hidden;
+        if (e.key === 'Escape') { closeRoundMenu(); return; }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!open) openRoundMenu();
+          else setActiveRound(roundActive + (e.key === 'ArrowDown' ? 1 : -1));
+        } else if ((e.key === 'Enter' || e.key === ' ') && open) {
+          e.preventDefault();  // keep the button's click-toggle from also firing
+          const li = $('roundMenu').querySelectorAll('li[role=option]')[roundActive];
+          if (li) selectRound(li.dataset.val);
+        }
+      });
       document.addEventListener('click', (e) => { if (!e.target.closest('.round-combo')) closeRoundMenu(); });
+    }
+
+    // --- player picker: a leaderboard panel over the hidden <select> --------
+    // Chips flow left→right in leaderboard order, one position badge per tie
+    // group (who's tied reads at a glance); the cut line splits off CUT/WD.
+    let playerActive = -1;
+    function syncPlayerBtn() { $('playerBtnLabel').textContent = playerLabel() || 'pick a tournament'; }
+    const isOutPos = (pos) => /cut|wd|dq/i.test(pos || '');
+    const fmtTotal = (t) => (t || '').replace('-', '−');  // proper minus sign
+    function renderPlayerBoard(filter) {
+      const q = (filter || '').trim().toLowerCase();
+      const selId = $('player').value;
+      const ps = (state.players || []).filter(p => !q || p.name.toLowerCase().includes(q));
+      const board = $('playerBoard');
+      playerActive = -1;
+      if (!ps.length) { board.innerHTML = '<div class="pempty">No matches</div>'; return; }
+      const chip = (p) => {
+        const t = p.total || '';
+        const scls = t.startsWith('-') ? 'under' : (t.startsWith('+') ? 'over' : '');
+        return `<button type="button" class="pchip${p.id === selId ? ' sel' : ''}" data-id="${p.id}" role="option" aria-selected="${p.id === selId}">
+          <span class="pname">${esc(p.name)}</span><span class="pscore ${scls}">${esc(fmtTotal(t))}</span></button>`;
+      };
+      let html = '', cutDone = false, g = null;
+      const flush = () => { if (g && g.chips.length) html += `<span class="pgpos${g.out ? ' out' : ''}">${esc(g.pos || '—')}</span><span class="pgchips${g.out ? ' out' : ''}">${g.chips.join('')}</span>`; };
+      for (const p of ps) {
+        const out = isOutPos(p.position);
+        if (out && !cutDone) { flush(); g = null; html += '<div class="pcut">Missed cut · WD</div>'; cutDone = true; }
+        if (!g || p.position !== g.pos) { flush(); g = { pos: p.position, out, chips: [] }; }
+        g.chips.push(chip(p));
+      }
+      flush();
+      board.innerHTML = html;
+    }
+    const visibleChips = () => [...$('playerBoard').querySelectorAll('.pchip')];
+    function setActivePlayer(i) {
+      const items = visibleChips();
+      if (!items.length) return;
+      playerActive = Math.max(0, Math.min(i, items.length - 1));
+      items.forEach((el, idx) => el.classList.toggle('active', idx === playerActive));
+      items[playerActive].scrollIntoView({ block: 'nearest' });
+    }
+    function openPlayerPanel() {
+      $('playerFilter').value = '';
+      renderPlayerBoard('');
+      $('playerPanel').hidden = false;
+      $('playerBtn').setAttribute('aria-expanded', 'true');
+      const sel = $('playerBoard').querySelector('.pchip.sel');
+      if (sel) sel.scrollIntoView({ block: 'center' });  // sticky to the current pick
+      $('playerFilter').focus();
+    }
+    function closePlayerPanel() { $('playerPanel').hidden = true; $('playerBtn').setAttribute('aria-expanded', 'false'); }
+    function choosePlayer(id) {
+      closePlayerPanel();
+      if (!id || id === $('player').value) return;
+      $('player').value = id;
+      syncPlayerBtn();
+      loadShots();
+    }
+    function setupPlayerCombo() {
+      $('playerBtn').addEventListener('click', () => { $('playerPanel').hidden ? openPlayerPanel() : closePlayerPanel(); });
+      $('playerBoard').addEventListener('click', (e) => { const c = e.target.closest('.pchip'); if (c) choosePlayer(c.dataset.id); });
+      $('playerFilter').addEventListener('input', () => { renderPlayerBoard($('playerFilter').value); if (visibleChips().length) setActivePlayer(0); });
+      $('playerFilter').addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActivePlayer(playerActive + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActivePlayer(playerActive - 1); }
+        else if (e.key === 'Enter') { e.preventDefault(); const items = visibleChips(); const c = items[playerActive] || items[0]; if (c) choosePlayer(c.dataset.id); }
+        else if (e.key === 'Escape') { closePlayerPanel(); $('playerBtn').focus(); }
+      });
+      document.addEventListener('click', (e) => { if (!e.target.closest('.field-player')) closePlayerPanel(); });
     }
 
     function setActiveView(view) {
@@ -1057,6 +1212,7 @@
       initTheme();
       setupTournCombo();
       setupRoundCombo();
+      setupPlayerCombo();
       const q = new URLSearchParams(location.search);
       const wantT = q.get('t'), wantP = q.get('p'), wantR = q.get('r'), wantV = q.get('v');
       if (wantV === 'shots' || wantV === 'trails') setActiveView('shots');

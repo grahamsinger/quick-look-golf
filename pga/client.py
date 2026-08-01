@@ -99,6 +99,31 @@ class PGATourClient:
 
     # -- core request -------------------------------------------------------
 
+    def _post(self, body: dict) -> httpx.Response:
+        """POST with the current key; on an auth failure, assume the key rotated,
+        re-scrape fresh keys from the site bundle, and retry each candidate once.
+        The working key sticks on the instance so the recovery cost is paid once.
+        """
+        resp = self._http.post(
+            self.endpoint, json=body, headers={"x-api-key": self.api_key}
+        )
+        if resp.status_code not in (401, 403):
+            resp.raise_for_status()
+            return resp
+        candidates = [
+            k for k in [*self.discover_keys(), *KNOWN_KEYS] if k != self.api_key
+        ]
+        for key in dict.fromkeys(candidates):  # dedupe, keep order
+            retry = self._http.post(
+                self.endpoint, json=body, headers={"x-api-key": key}
+            )
+            if retry.status_code not in (401, 403):
+                self.api_key = key
+                retry.raise_for_status()
+                return retry
+        resp.raise_for_status()  # every key failed — surface the original 401/403
+        return resp
+
     def query(
         self,
         query: str,
@@ -110,13 +135,7 @@ class PGATourClient:
             body["variables"] = variables
         if operation_name is not None:
             body["operationName"] = operation_name
-        resp = self._http.post(
-            self.endpoint,
-            json=body,
-            headers={"x-api-key": self.api_key},
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = self._post(body).json()
         if data.get("errors"):
             raise GraphQLError(data["errors"])
         return data["data"]
@@ -128,11 +147,7 @@ class PGATourClient:
         the raw `{"data": ..., "errors": ...}` envelope. Used by the server's
         passthrough proxy so GraphiQL can surface errors itself.
         """
-        resp = self._http.post(
-            self.endpoint, json=body, headers={"x-api-key": self.api_key}
-        )
-        resp.raise_for_status()
-        return resp.json()
+        return self._post(body).json()
 
     def introspect(self) -> dict:
         """Return the raw introspection result: {"__schema": {...}}."""

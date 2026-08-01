@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -100,9 +101,12 @@ def _cache_get(key: str) -> str | None:
         return None
 
 
-def _cache_set(key: str, value: str) -> None:
+def _cache_set(key: str, value: str, ttl: int | None = None) -> None:
     try:
-        _redis.set(key, value)  # no expiry: final rounds are immutable
+        if ttl:
+            _redis.setex(key, ttl, value)  # short-lived (in-progress round)
+        else:
+            _redis.set(key, value)  # no expiry: final rounds are immutable
     except Exception:
         pass
 
@@ -122,6 +126,21 @@ def _round_final(data: dict) -> bool:
     )
 
 
+# The UI loads /api/shots and /api/putts in parallel and both derive from the
+# same shotDetailsV3 payload — without coordination a cold cache means two
+# identical upstream fetches. A per-key lock makes the second request wait and
+# hit the cache instead; a short TTL on in-progress rounds means view-flipping
+# during live play reuses one capture instead of hammering PGA on every click.
+LIVE_TTL_S = 30
+_fetch_locks: dict[str, threading.Lock] = {}
+_fetch_locks_guard = threading.Lock()
+
+
+def _fetch_lock(key: str) -> threading.Lock:
+    with _fetch_locks_guard:
+        return _fetch_locks.setdefault(key, threading.Lock())
+
+
 def shot_details_cached(
     tournament_id: str, player_id: str, round_num: int, refresh: bool = False
 ) -> tuple[dict, bool, int]:
@@ -136,16 +155,17 @@ def shot_details_cached(
     key = f"golf:{CACHE_VERSION}:shotdetails:{tournament_id}:{player_id}:{round_num}"
     if refresh:
         _cache_del(key)
-    else:
-        cached = _cache_get(key)
-        if cached is not None:
-            obj = json.loads(cached)
-            return obj["data"], True, obj.get("fetchedAt")
-    data = client.shot_details(tournament_id, player_id, round_num, include_radar=True)
-    fetched_at = int(time.time() * 1000)
-    if _round_final(data):
-        _cache_set(key, json.dumps({"fetchedAt": fetched_at, "data": data}))
-    return data, False, fetched_at
+    with _fetch_lock(key):
+        if not refresh:
+            cached = _cache_get(key)
+            if cached is not None:
+                obj = json.loads(cached)
+                return obj["data"], True, obj.get("fetchedAt")
+        data = client.shot_details(tournament_id, player_id, round_num, include_radar=True)
+        fetched_at = int(time.time() * 1000)
+        payload = json.dumps({"fetchedAt": fetched_at, "data": data})
+        _cache_set(key, payload, ttl=None if _round_final(data) else LIVE_TTL_S)
+        return data, False, fetched_at
 
 
 @app.post("/api/graphql")
@@ -234,7 +254,6 @@ def shots(
     tournamentId: str,
     playerId: str,
     round: int = 1,
-    radar: bool = True,  # kept for API compatibility; payload is always radar-on
     refresh: bool = False,
 ) -> dict:
     """Shot-by-shot data: {holes: [{holeNumber, par, strokes: [...]}]}."""

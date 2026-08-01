@@ -1,7 +1,11 @@
 # Next steps / open threads
 
-Ideas discussed but not built, and things to verify. Nothing here is broken —
-these are optional improvements.
+Ideas discussed but not built, and things to verify.
+
+## Known bugs
+(none currently — the round-label desync on the no-data fallback was fixed
+Aug 2026: the fallback now calls `syncRoundBtn()` after writing
+`$('round').value`, verified against the live-event repro.)
 
 ## To do
 - **Push to GitHub** — planned (do `gh repo create`, decide public/private).
@@ -57,14 +61,24 @@ dark-slate + green look):
   the tournament** (round-tagged). Server returns each round's top-10 misses +
   `madePuttFeet`; the client aggregates.
 
+- **Player picker → leaderboard panel (v1, Aug 2026)** — the user's design: the
+  dropdown IS a mini leaderboard. A two-column grid: a right-aligned **position
+  rail** (one badge per tie group — who's tied reads instantly) | that group's
+  player chips (name + colored score) wrapping to the right. Search-the-field
+  typeahead on top (arrows/Enter/Escape work), a **"Missed cut · WD" divider**
+  with dimmed chips below, opens sticky-scrolled to the current pick, backed by
+  the hidden `<select>` so deep links/labels flow unchanged.
+- **Robustness pass (Aug 2026)** — per-key fetch lock + 30s TTL on in-progress
+  rounds (the parallel shots+putts load no longer double-hits PGA; live
+  view-flipping reuses one capture); a stale-response guard in `loadShots`
+  (rapid round-stepping can't paint old data over new); API-key rotation
+  self-healing in the client (on 401/403 it re-scrapes keys and retries);
+  `esc()` on all API strings hitting innerHTML; round menu keyboard nav;
+  dead `radar` param removed.
+
 Still open (design):
-- **Player picker → searchable combobox** — the player picker is still a native
-  `<select>` (raw OS list, jarring next to the styled tournament/round pickers).
-  Give it the same treatment: searchable/typeahead over the 144+ field (keep the
-  position + score, open sticky to the current pick). *Parked pending the user's
-  "compelling design" idea for quickly selecting players.* (The round picker
-  already got the custom styled-menu treatment — see shipped.)
 - Responsive / mobile layout.
+- Player picker refinements as they come up (density, maybe headshots?).
 
 ## Possible improvements
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*
@@ -75,10 +89,26 @@ Still open (design):
   (tends to feel noisy, so left off).
 - **Server-Timing** — the load-time indicator is browser wall-clock; could add a
   `Server-Timing` header to split "server N ms / total M ms".
-- **Spatial shot viz (needs the hole image)** — the abstract shot-trail SVG plots
-  were removed (meaningless without the course underneath). Any future spatial
-  view must overlay the real hole image (`holeDetails` "pickle" assets) behind the
-  shot paths; do not reintroduce bare plots without it.
+- **Spatial shot viz — now feasible (hole imagery located, Aug 2026).** The
+  abstract shot-trail SVG plots were removed (meaningless without the course
+  underneath); any spatial view must overlay real imagery. Findings:
+  - **The winner: TOURCAST's static asset host, no auth.**
+    `https://tourcast.pgatour.com/models/{tournamentId}/3D_Assets/terrain/course.jpg`
+    is a 2048×2048 aerial of the whole course (verified for R2026524), with
+    `course.tfw` (a world file — the affine pixel→world transform; its pixel
+    size appears scaled to a ~70k×91k full-res source) and `extents.txt`
+    alongside. Our cached `shotDetailsV3` strokes already carry
+    `overview.leftToRightCoords` `tourcastX/Y` — same coordinate space. So:
+    crop the aerial per hole and plot strokes over it. (Same dir has greens
+    textures, tree sprites, 3D models if ever wanted.)
+  - Dead ends, verified: `holeDetails(tournamentId, courseId, hole)` (courseId
+    from `courseStats`) returns Cloudinary "pickle" URLs
+    (`pga-tour-res.cloudinary.com/.../holes_2026_r_524_947_overhead_full_15.jpg`)
+    that **404** (deprecated in-schema), and `ImageAsset {imageOrg, imagePath}`
+    whose imgix guesses **410**. `holeImage` (a course *photo*, not overhead)
+    does resolve on `res.cloudinary.com/pgatour-prod`.
+  - `holeDetails` also returns per-hole scoring stats (`statsSummary`: birdie% etc.
+    + `rank`) — could power a "hole difficulty" strip even without the viz.
 - **Live subscriptions** — the schema exposes `OnUpdate*` subscriptions over
   `orchestrator-ws.pgatour.com/graphql`; could stream live updates instead of
   manual refresh.
