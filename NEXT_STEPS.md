@@ -8,6 +8,24 @@ these are optional improvements.
   Note `pga/client.py` contains pgatour.com's *public* front-end API keys
   (scraped from their JS), not personal secrets — safe to publish.
 
+## Design refresh (comprehensive)
+The current UI is functional but visually generic — it reads as an
+AI-generated/template dashboard and lacks polish. The data-first look was a
+deliberate v1 tradeoff (get the numbers right and the interactions working
+first); the UI was not a focus. A future pass should give it a real visual
+identity, not just tweaks. Directions to consider:
+- Intentional **typography** (a real typeface, type scale, weights) instead of
+  system-font defaults.
+- A considered **color system** beyond the default dark-slate + green accent —
+  something that feels designed, with a proper neutral ramp and accent usage.
+- Custom **wordmark / favicon**; drop the emoji-in-buttons (🔗, ↻) for real icons.
+- More deliberate **spacing rhythm, density, and alignment** (the controls row,
+  cards, and tables currently look like default flexbox scaffolding).
+- Chart/table styling with a real data-viz sensibility (see the `dataviz` skill).
+- Consider a light theme / theme toggle, and responsive/mobile layout.
+This is UI-only — the data model, endpoints, and caching are solid and shouldn't
+need to change.
+
 ## Possible improvements
 - **Player typeahead** — the player dropdown is a plain `<select>` (144+ names);
   give it the same searchable combobox treatment as the tournament picker.
