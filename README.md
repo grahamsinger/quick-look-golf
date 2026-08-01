@@ -11,22 +11,55 @@ genuine shot-by-shot (ShotLink-derived) data.
 
 ```bash
 ./start.sh        # launches FastAPI + uvicorn on http://127.0.0.1:8600
-./stop.sh         # shuts it down
+./stop.sh         # shuts it down       (PORT=9000 ./start.sh to override)
 ```
+
+Runs on **:8600** (deliberately clear of the marathon_training app on :8000).
+Uses a local **Redis** at `127.0.0.1:6379` for caching if present; degrades
+gracefully to live fetches if Redis is down (`REDIS_HOST`/`PORT`/`DB` override).
 
 Then open:
 
 | URL | What |
 |---|---|
-| http://127.0.0.1:8600/ | **Shot Explorer** — two views (toggle top-left): *Shot trails* (each hole's shot path + play-by-play + radar) and *First putts* (first-putt length per hole grouped by the score made, + summary + table) |
+| http://127.0.0.1:8600/ | **Shot Explorer** (see below) |
 | http://127.0.0.1:8600/graphiql | **GraphiQL** — full-API playground with autocomplete (introspection is on) |
 | http://127.0.0.1:8600/docs | **Swagger UI** for the REST convenience endpoints |
 
+### Shot Explorer
+
+- **Controls:** season, a **searchable tournament combobox** (dates, "LIVE" badge
+  on the in-progress event, which is the default), player (defaults to the leader),
+  round (1–4 or **All rounds**, the default). Opens straight to the live event.
+- **Shot trails** view: per-hole cards with an SVG shot path (tee → landing → cup),
+  play-by-play, and TrackMan radar (ball/club speed, launch, spin, apex).
+- **First putts** view:
+  - *Single round* — table of **Hole · Had · Proximity · Made · Result**, where
+    *Had* = distance to the pin before the approach, *Proximity* = how close it
+    finished (first-putt length), *Made* = first putt holed. Green row = 1-putt,
+    red = 3-putt+.
+  - *All rounds* — a **front/back matrix** (9 rows, nines side by side): each cell
+    shows proximity (big) over the had-distance (small), colored by score.
+- **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=`), so a
+  reload restores the view and a **🔗 copy link** button shares it. A freshness
+  bar shows **"data current as of … · loaded in N ms · cached/live"** with a
+  **↻ refresh** that force-re-fetches (busting the cache for the rare ShotLink
+  correction).
+
 The server proxies GraphQL through `POST /api/graphql` and injects the API key,
-so the browser never handles the key and there are no CORS issues. Convenience
-JSON endpoints: `/api/schedule`, `/api/leaderboard`, `/api/shots`, `/api/putts`
-(first-putt length + score result per hole; a putt = any stroke from the green,
-its length = distance-to-hole going into it).
+so the browser never handles the key and there are no CORS issues.
+
+### Caching model
+
+Completed rounds are immutable, so the server caches the **raw radar-on
+`shotDetailsV3` payload once per (tournament, player, round)** in Redis with no
+expiry; both `/api/shots` and `/api/putts` derive from that single entry
+(verified lossless — `includeRadar:true` is a strict superset of `false`). A
+round is cached only once *final* (every hole scored); the in-progress round is
+never cached. `refresh=true` on either endpoint busts the key.
+
+Convenience JSON endpoints: `/api/schedule`, `/api/leaderboard`, `/api/shots`,
+`/api/putts`. Responses carry an `X-Cache: HIT|MISS` header.
 
 ## Layout
 
