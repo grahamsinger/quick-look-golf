@@ -183,11 +183,11 @@
     .combo-empty { color: var(--ink-3); padding: 9px 11px; }
 
     /* status line */
-    #status { padding: 12px 24px 0; color: var(--ink-3); font-size: 12.5px; min-height: 18px; }
+    #status { margin-left: auto; color: var(--ink-3); font-size: 12.5px; text-align: right; padding-left: 16px; }
     #status.err { color: var(--flag); }
 
     /* view toggle */
-    .viewbar { display: flex; align-items: center; gap: 18px; padding: 16px 24px 0; flex-wrap: wrap; }
+    .viewbar { display: flex; align-items: center; gap: 18px; padding: 12px 24px 0; flex-wrap: wrap; }
     .seg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 3px; gap: 2px; }
     .segbtn {
       display: inline-flex; align-items: center; gap: 7px; background: transparent; color: var(--ink-2);
@@ -198,16 +198,16 @@
     .segbtn.active { background: var(--card); color: var(--pine); box-shadow: var(--shadow-sm); }
     .segbtn.active .ic { color: var(--pine); }
 
-    main { padding: 10px 24px 72px; max-width: 1200px; }
-    .summary { margin: 18px 0 12px; display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; }
-    .summary .who { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 25px; color: var(--ink); letter-spacing: -.01em; }
+    main { padding: 6px 24px 56px; max-width: 1200px; }
+    .summary { margin: 10px 0 8px; display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; }
+    .summary .who { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
     .summary .meta { color: var(--ink-3); font-size: 13px; }
     .summary .meta b { color: var(--ink-2); }
 
     /* freshness bar */
     .asof {
       display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ink-3); font-size: 12px;
-      background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 6px 8px 6px 14px; margin: 0 0 18px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 5px 8px 5px 13px; margin: 0 0 10px;
     }
     .asof .clock { color: var(--sand); }
     .asof b { color: var(--ink); font-weight: 600; }
@@ -248,21 +248,25 @@
     .card.scorecard { display: inline-flex; align-items: flex-start; padding: 6px 8px 12px; }
     .scorecard .nine { padding: 0 12px; }
     .scorecard .nine + .nine { border-left: 1px solid var(--line); }
-    .scorecard table.putts th, .scorecard table.putts td { padding: 8px 14px; }
+    .scorecard table.putts th, .scorecard table.putts td { padding: 6px 14px; }
+    /* reserve the tee-flag slot in every hole cell so the start marker never
+       widens one nine's Hole column (keeps Front/Back symmetric) */
+    .hole .startslot { display: inline-block; width: 15px; text-align: center; }
+    .hole .teeflag { width: 11px; height: 11px; vertical-align: -1px; }
     /* shortest missed putts (daily view) */
-    .misspanel { margin: 6px 0 20px; }
-    .misspanel-hd { font-size: 12.5px; font-weight: 650; color: var(--ink-2); margin: 0 0 10px 2px; letter-spacing: .01em; }
+    .misspanel { margin: 2px 0 10px; }
+    .misspanel-hd { font-size: 12px; font-weight: 650; color: var(--ink-2); margin: 0 0 7px 2px; letter-spacing: .01em; }
     .misspanel-hd .misspanel-sub { color: var(--ink-3); font-weight: 400; }
-    .misstiles { display: flex; flex-wrap: wrap; gap: 10px; }
+    .misstiles { display: flex; flex-wrap: wrap; gap: 9px; }
     .misstile { background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
-      box-shadow: var(--shadow-sm); padding: 11px 15px; min-width: 118px; display: flex; flex-direction: column; gap: 6px; }
-    .mt-len { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 600; font-size: 25px;
+      box-shadow: var(--shadow-sm); padding: 7px 13px 8px; min-width: 116px; display: flex; flex-direction: column; gap: 3px; }
+    .mt-len { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 600; font-size: 20px;
       line-height: 1; font-variant-numeric: tabular-nums; }
     .mt-len .mt-unit { font-family: var(--sans); font-size: 12px; font-weight: 500; margin-left: 3px; color: var(--ink-3); }
     .mt-meta { font-size: 11.5px; color: var(--ink-3); }
     .mt-res { margin-top: 1px; }
 
-    .caphint { color: var(--ink-3); font-size: 12px; margin: 14px 2px 12px; line-height: 1.65; }
+    .caphint { color: var(--ink-3); font-size: 12px; margin: 8px 2px 9px; line-height: 1.55; }
     .caphint b { color: var(--ink-2); }
     .caphint b.made { color: var(--good); } .caphint b.tp { color: var(--bad); }
 
@@ -375,7 +379,6 @@
     </button>
   </div>
 
-  <div id="status"></div>
   <div class="viewbar">
     <div class="seg" role="tablist">
       <button class="segbtn active" data-view="putts" role="tab">
@@ -387,6 +390,7 @@
         Shots
       </button>
     </div>
+    <div id="status"></div>
   </div>
   <main><div id="out"></div></main>
 
@@ -631,6 +635,10 @@
       return 'double';
     }
     const ordPutt = (n) => (['', '1st', '2nd', '3rd', '4th', '5th', '6th'][n] || `${n}th`);
+    // small tee flag marking the hole the player started the round on
+    const START_MARK = '<svg class="teeflag" viewBox="0 0 12 12" fill="none" aria-hidden="true">'
+      + '<line x1="3" y1="1.6" x2="3" y2="10.4" stroke="var(--pine)" stroke-width="1.3" stroke-linecap="round"/>'
+      + '<path d="M3 2 L8.6 3.6 L3 5.2 Z" fill="var(--flag)"/></svg>';
 
     // The 5 shortest putts the player missed this round (daily view only).
     function shortestMissedPanel(list) {
@@ -652,7 +660,9 @@
       const d = state.putts;
       if (!d) { $('out').innerHTML = ''; return; }
       const rows = d.holes.slice().sort((a, b) => a.hole - b.hole);
+      const startHole = (d.holes[0] || {}).hole;  // holes arrive in play order → first = start
       const rowHtml = (r) => {
+        const isStart = r.hole === startHole;
         const cls = r.putts === 1 ? 'made' : r.putts >= 3 ? 'threeputt' : '';
         const had = r.approachHad
           ? `<span title="hit it ${r.approachDist || '?'} from ${r.approachFrom || '?'}">${r.approachHad}</span>`
@@ -663,7 +673,7 @@
           ? '<span class="made-na" title="holed from off the green — no putt on this hole">—</span>'
           : `<span class="${r.putts === 1 ? 'made-yes' : r.putts >= 3 ? 'made-no' : 'putts-cnt'}" title="${r.putts} putt${r.putts === 1 ? '' : 's'}">${r.putts}</span>`;
         return `<tr class="${cls}">
-          <td class="hole">${r.hole}</td>
+          <td class="hole">${r.hole}<span class="startslot"${isStart ? ' title="Teed off here — started the round on this hole"' : ''}>${isStart ? START_MARK : ''}</span></td>
           <td class="num">${had}</td>
           <td class="num dist">${prox}</td>
           <td class="num">${puttsCell}</td>
@@ -681,7 +691,7 @@
       const front = nine('Front', rows.filter(r => r.hole <= 9));
       const back = nine('Back', rows.filter(r => r.hole > 9));
       $('out').innerHTML =
-        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b> · first putts</span></div>
+        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts</span></div>
          ${asOfBar(state.puttsTs)}
          ${shortestMissedPanel(d.shortestMissed)}
          <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Putts</b> = putts taken on the hole · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
