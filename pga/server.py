@@ -221,7 +221,7 @@ def leaderboard(tournamentId: str) -> dict:
           ... on PlayerRowV3 {
             id
             player { id firstName lastName }
-            scoringData { position total }
+            scoringData { position total thru score teeTime currentRound rounds }
           }
         }
       }
@@ -234,12 +234,24 @@ def leaderboard(tournamentId: str) -> dict:
         if not p:
             continue
         sd = r.get("scoringData") or {}
+        # today's strokes (e.g. "61") once the round is finished: rounds is a
+        # per-round strokes list ("-" until played), currentRound is 1-based
+        rounds = sd.get("rounds") or []
+        cur = sd.get("currentRound")
+        today_strokes = None
+        if sd.get("thru") == "F" and cur and 1 <= cur <= len(rounds) and rounds[cur - 1] != "-":
+            today_strokes = rounds[cur - 1]
         players.append(
             {
                 "id": p["id"],
                 "name": f"{p['firstName']} {p['lastName']}".strip(),
                 "position": sd.get("position"),
                 "total": sd.get("total"),
+                # daily progress: thru = "F" (done) / hole number / "" (not out)
+                "thru": sd.get("thru"),
+                "today": sd.get("score"),        # today's score to par
+                "todayStrokes": today_strokes,   # today's strokes when thru == "F"
+                "teeTime": sd.get("teeTime"),    # ms timestamp, set before teeing off
             }
         )
     # e.g. "R3" -> 3: the tournament's latest round with data

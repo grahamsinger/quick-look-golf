@@ -67,7 +67,10 @@ dark-slate + green look):
   player chips (name + colored score) wrapping to the right. Search-the-field
   typeahead on top (arrows/Enter/Escape work), a **"Missed cut · WD" divider**
   with dimmed chips below, opens sticky-scrolled to the current pick, backed by
-  the hidden `<select>` so deep links/labels flow unchanged.
+  the hidden `<select>` so deep links/labels flow unchanged. Each chip carries a
+  **daily-progress slot** right of the score: tee time before they're out,
+  "thru N" mid-round, "F ‹strokes›" once done (from `scoringData`'s
+  thru/teeTime/rounds via `/api/leaderboard`).
 - **Robustness pass (Aug 2026)** — per-key fetch lock + 30s TTL on in-progress
   rounds (the parallel shots+putts load no longer double-hits PGA; live
   view-flipping reuses one capture); a stale-response guard in `loadShots`

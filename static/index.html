@@ -160,8 +160,12 @@
     .pchip:hover { border-color: var(--pine); background: var(--card); }
     .pchip .pscore { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink-3); font-weight: 640; }
     .pchip .pscore.under { color: var(--good); } .pchip .pscore.over { color: var(--bad); }
+    /* daily progress slot: tee time · "thru N" · final round score */
+    .pchip .pprog { border-left: 1px solid var(--line-2); padding-left: 8px; margin-left: 1px;
+      font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .pchip.sel { background: var(--pine); border-color: var(--pine); color: #F4EFE2; }
     .pchip.sel .pscore, .pchip.sel .pscore.under, .pchip.sel .pscore.over { color: rgba(244,239,226,.8); }
+    .pchip.sel .pprog { color: rgba(244,239,226,.66); border-left-color: rgba(244,239,226,.3); }
     .pchip.active { outline: 2px solid var(--pine); outline-offset: 1px; }
     .pcut { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; color: var(--ink-3);
       font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; margin: 6px 0 0; }
@@ -1118,11 +1122,21 @@
       const board = $('playerBoard');
       playerActive = -1;
       if (!ps.length) { board.innerHTML = '<div class="pempty">No matches</div>'; return; }
+      // daily progress: finished → "F 61" (today's strokes), mid-round →
+      // "thru 12", not out yet → the tee time, otherwise nothing
+      const prog = (p) => {
+        if (isOutPos(p.position)) return '';
+        if (p.thru === 'F') return 'F ' + (p.todayStrokes || fmtTotal(p.today) || '');
+        if (p.thru && p.thru !== '-') return `thru ${p.thru}`;
+        if (p.teeTime) return new Date(p.teeTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return '';
+      };
       const chip = (p) => {
         const t = p.total || '';
         const scls = t.startsWith('-') ? 'under' : (t.startsWith('+') ? 'over' : '');
+        const pr = prog(p);
         return `<button type="button" class="pchip${p.id === selId ? ' sel' : ''}" data-id="${p.id}" role="option" aria-selected="${p.id === selId}">
-          <span class="pname">${esc(p.name)}</span><span class="pscore ${scls}">${esc(fmtTotal(t))}</span></button>`;
+          <span class="pname">${esc(p.name)}</span><span class="pscore ${scls}">${esc(fmtTotal(t))}</span>${pr ? `<span class="pprog">${esc(pr)}</span>` : ''}</button>`;
       };
       let html = '', cutDone = false, g = null;
       const flush = () => { if (g && g.chips.length) html += `<span class="pgpos${g.out ? ' out' : ''}">${esc(g.pos || '—')}</span><span class="pgchips${g.out ? ' out' : ''}">${g.chips.join('')}</span>`; };
