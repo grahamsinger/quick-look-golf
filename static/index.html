@@ -183,8 +183,9 @@
     .combo-empty { color: var(--ink-3); padding: 9px 11px; }
 
     /* status line */
-    #status { margin-left: auto; color: var(--ink-3); font-size: 12.5px; text-align: right; padding-left: 16px; }
+    #status { margin-left: auto; display: flex; justify-content: flex-end; align-items: center; color: var(--ink-3); font-size: 12.5px; padding-left: 16px; min-height: 36px; }
     #status.err { color: var(--flag); }
+    #status .asof { margin: 0; }
 
     /* view toggle */
     .viewbar { display: flex; align-items: center; gap: 18px; padding: 12px 24px 0; flex-wrap: wrap; }
@@ -221,24 +222,23 @@
     .ibtn:disabled { opacity: .5; cursor: default; }
     .ibtn .ic { color: var(--ink-3); } .ibtn:hover .ic { color: var(--pine); }
 
-    /* ---------- shot-trail cards ---------- */
-    .holes { display: grid; grid-template-columns: repeat(auto-fill, minmax(372px, 1fr)); gap: 16px; }
-    .hole { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
-    .hole-hd { display: flex; align-items: baseline; gap: 11px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
-    .hole-hd .num { font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 600; font-size: 22px; line-height: 1; color: var(--ink); }
-    .hole-hd .meta { color: var(--ink-3); font-size: 12px; }
-    .hole-hd .score { margin-left: auto; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
-    .hole-body { padding: 14px 16px; }
-    .strokes { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
-    .strk { border-left: 2.5px solid var(--charcoal); padding-left: 10px; }
-    .strk.putt { border-color: var(--sand); }
-    .strk.penalty { border-color: var(--flag); }
-    .strk .pbp { font-size: 13px; color: var(--ink); }
-    .strk .loc { color: var(--ink-3); font-size: 11px; margin-top: 1px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
-    .chip { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
-      padding: 2px 7px; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-    .chip b { color: var(--ink-2); font-weight: 640; }
+    /* ---------- shots comparison matrix ---------- */
+    .card.shotmatrix { padding: 4px 6px 12px; }
+    table.shots { border-collapse: collapse; width: auto; }
+    table.shots th, table.shots td { padding: 7px 13px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; font-size: 13px; }
+    table.shots thead th { color: var(--ink-3); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; border-bottom: 1.5px solid var(--line-2); vertical-align: bottom; }
+    table.shots thead th.scol { color: var(--sand); }
+    table.shots tbody tr:last-child td { border-bottom: none; }
+    table.shots td.hole { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; font-size: 15px; color: var(--ink); }
+    table.shots td.spar, table.shots th.spar-h { text-align: center; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    table.shots td.scell { vertical-align: top; }
+    .sc-v { display: block; font-variant-numeric: tabular-nums; font-weight: 640; color: var(--ink); font-size: 13.5px; line-height: 1.15; }
+    .sc-v .sc-u { font-weight: 400; color: var(--ink-3); font-size: 10px; margin-left: 2px; }
+    .sc-r { display: block; font-size: 10.5px; margin-top: 1px; color: var(--ink-3); }
+    .sc-r.r-good { color: var(--good); } .sc-r.r-warn { color: var(--warn); } .sc-r.r-bad { color: var(--bad); }
+    sup.p3 { color: var(--sand); font-size: 8px; font-weight: 800; margin-left: 3px; vertical-align: super; }
+    table.shots td.sscore { text-align: center; }
+    .caphint b.rg-good { color: var(--good); } .caphint b.rg-warn { color: var(--warn); } .caphint b.rg-bad { color: var(--bad); }
 
     /* ---------- first-putts card + tables ---------- */
     .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
@@ -569,39 +569,49 @@
       } catch (e) { sel.innerHTML = '<option>—</option>'; status('Field failed: ' + e.message, true); }
     }
 
-    // ---- shot-by-shot rendering -----------------------------------------
-    function radarChips(r) {
-      if (!r) return '';
-      const bits = [];
-      if (r.ballSpeed) bits.push(`<span class="chip">ball <b>${r.ballSpeed}</b> mph</span>`);
-      if (r.clubSpeed) bits.push(`<span class="chip">club <b>${r.clubSpeed}</b></span>`);
-      if (r.verticalLaunchAngle) bits.push(`<span class="chip">launch <b>${r.verticalLaunchAngle}°</b></span>`);
-      if (r.launchSpin) bits.push(`<span class="chip">spin <b>${Math.round(r.launchSpin)}</b></span>`);
-      if (r.apexHeight) bits.push(`<span class="chip">apex <b>${r.apexHeight}</b> ft</span>`);
-      return bits.length ? `<div class="chips">${bits.join('')}</div>` : '';
+    // ---- shots comparison matrix ----------------------------------------
+    // classify a shot's to-location into a short label + quality class
+    function shotResult(loc) {
+      const s = (loc || '').toLowerCase();
+      if (/green/.test(s)) return { label: 'green', cls: 'good' };
+      if (/fairway/.test(s)) return { label: 'fairway', cls: 'good' };
+      if (/fringe|collar|apron/.test(s)) return { label: 'fringe', cls: 'good' };
+      if (/bunker|sand/.test(s)) return { label: 'bunker', cls: 'bad' };
+      if (/water|hazard|penal|lateral|drop/.test(s)) return { label: 'penalty', cls: 'bad' };
+      if (/tree|native|waste|fescue|desert|out of bounds/.test(s)) return { label: 'trouble', cls: 'bad' };
+      if (/rough|intermediate|primary/.test(s)) return { label: 'rough', cls: 'warn' };
+      if (/tee/.test(s)) return { label: 'tee', cls: '' };
+      return { label: s || '—', cls: '' };
     }
-
-    function renderStroke(s) {
-      const type = (s.strokeType || '').toUpperCase();
-      const cls = type === 'PUTT' ? 'putt' : type === 'PENALTY' ? 'penalty' : '';
-      return `<div class="strk ${cls}">
-        <div class="pbp"><b>${s.strokeNumber}.</b> ${s.playByPlay || ''}</div>
-        <div class="loc">${s.fromLocation || ''} → ${s.toLocation || ''}</div>
-        ${radarChips(s.radarData)}
-      </div>`;
+    // compact a ShotLink distance string ("322 yds", "46 ft 2 in.") for a cell
+    function shotDist(str) {
+      if (!str) return '';
+      let m = str.match(/([\d.]+)\s*yds/); if (m) return m[1] + 'y';
+      m = str.match(/(\d+)\s*ft/); if (m) return m[1] + '′';
+      m = str.match(/(\d+)\s*in/); if (m) return m[1] + '″';
+      return str;
     }
-
-    function renderHole(h) {
-      return `<div class="hole">
-        <div class="hole-hd">
-          <span class="num">${h.holeNumber}</span>
-          <span class="meta">Par ${h.par} · ${h.yardage} yds</span>
-          <span class="score" style="color:${resultColor((h.score != null && h.par != null) ? h.score - h.par : null)}">${h.score ?? ''}</span>
-        </div>
-        <div class="hole-body">
-          <div class="strokes">${(h.strokes || []).map(renderStroke).join('')}</div>
-        </div>
-      </div>`;
+    function shotCell(strokes, i, par) {
+      const s = strokes[i];
+      const isPutt = (s.fromLocation || '').toLowerCase() === 'green';
+      const isHoled = !((s.distanceRemaining || '') + '').trim();
+      const bs = s.radarData && s.radarData.ballSpeed;
+      let primary, unit = '';
+      if (bs) { primary = Math.round(bs); unit = 'mph'; }
+      else if (isPutt) { primary = i > 0 ? shotDist(strokes[i - 1].distanceRemaining) : shotDist(s.distance); }
+      else { primary = shotDist(s.distance); }
+      let res, cls;
+      if (isHoled) { res = isPutt ? 'made' : 'holed'; cls = 'good'; }
+      else if (isPutt) { res = shotDist(s.distanceRemaining) + ' left'; cls = ''; }
+      else { const r = shotResult(s.toLocation); res = r.label; cls = r.cls; }
+      const p3 = (i === 0 && par === 3) ? '<sup class="p3" title="par-3 tee shot — an iron/hybrid, not a drive">P3</sup>' : '';
+      const tip = [`#${s.strokeNumber}`, `${s.fromLocation || '?'} → ${isHoled ? 'holed' : (s.toLocation || '?')}`,
+        s.distance ? `${s.distance} shot` : '', bs ? `ball ${s.radarData.ballSpeed} mph` : '', s.playByPlay || '']
+        .filter(Boolean).join(' · ').replace(/"/g, '&quot;');
+      return `<td class="scell" title="${tip}">
+        <span class="sc-v">${primary}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}</span>
+        <span class="sc-r r-${cls}">${res}</span>
+      </td>`;
     }
 
     const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], view: 'putts' };
@@ -613,10 +623,30 @@
       const d = state.shots;
       if (!d) { $('out').innerHTML = ''; return; }
       const holes = d.holes || [];
+      if (!holes.length) { $('out').innerHTML = '<div class="summary"><span class="meta">No shot data for this round.</span></div>'; return; }
+      const startHole = holes[0].holeNumber;  // play order → first hole is the start
+      const maxShots = Math.max(1, ...holes.map(h => (h.strokes || []).length));
+      const shotHdrs = Array.from({ length: maxShots }, (_, i) => `<th class="scol">Shot ${i + 1}</th>`).join('');
+      const rows = holes.map(h => {
+        const strokes = h.strokes || [];
+        const cells = Array.from({ length: maxShots }, (_, i) =>
+          i < strokes.length ? shotCell(strokes, i, h.par) : '<td class="scell"></td>').join('');
+        const diff = (h.score != null && h.par != null) ? h.score - h.par : null;
+        const isStart = h.holeNumber === startHole;
+        return `<tr>
+          <td class="hole">${h.holeNumber}<span class="startslot"${isStart ? ' title="Teed off here — started the round on this hole"' : ''}>${isStart ? START_MARK : ''}</span></td>
+          <td class="spar">${h.par}</td>
+          ${cells}
+          <td class="sscore"><span class="pill ${pillClass(diff)}">${h.score != null ? h.score : ''}</span></td>
+        </tr>`;
+      }).join('');
       $('out').innerHTML =
-        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b> · shot-by-shot · <b>${holes.length}</b> holes</span></div>
-         ${asOfBar(state.shotsTs)}
-         <div class="holes">${holes.map(renderHole).join('')}</div>`;
+        `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b>${startHole !== 1 ? ` · started hole ${startHole}` : ''} · shot-by-shot</span></div>
+         <div class="caphint">Big number = <b>ball speed</b> (mph) on full swings, otherwise the shot distance / putt length · below it = where it finished (<b class="rg-good">fairway · green</b> / <b class="rg-warn">rough</b> / <b class="rg-bad">sand · penalty</b>) · <sup class="p3">P3</sup> = par-3 tee shot · read a column down to compare (e.g. every tee-shot ball speed)</div>
+         <div class="card shotmatrix"><table class="shots">
+           <thead><tr><th>Hole</th><th class="spar-h">Par</th>${shotHdrs}<th>Score</th></tr></thead>
+           <tbody>${rows}</tbody>
+         </table></div>`;
     }
 
     // ---- first-putts view -----------------------------------------------
@@ -692,7 +722,6 @@
       const back = nine('Back', rows.filter(r => r.hole > 9));
       $('out').innerHTML =
         `<div class="summary"><span class="who">${playerName()}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts</span></div>
-         ${asOfBar(state.puttsTs)}
          ${shortestMissedPanel(d.shortestMissed)}
          <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Putts</b> = putts taken on the hole · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
          <div class="card scorecard">${front}${back}</div>`;
@@ -749,8 +778,6 @@
         body += `<tr>${nineCells(frontHoles[i])}<td class="mxgap"></td>${nineCells(backHoles[i])}</tr>`;
       }
 
-      const tsList = played.map(r => state.puttsAllTs && state.puttsAllTs[r]).filter(Boolean);
-      const asOf = tsList.length ? Math.min(...tsList) : null;
       const key = `<div class="mxkey">
         <div class="kgrp"><span class="kt">Fill</span>
           <span class="ksw made">1</span> 1-putt
@@ -766,7 +793,6 @@
       </div>`;
       $('out').innerHTML =
         `<div class="summary"><span class="who">${playerName()}</span><span class="meta">All rounds · first-putt length (ft)</span></div>
-         ${asOfBar(asOf)}
          ${key}
          <div class="card"><table class="putts"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
     }
@@ -775,9 +801,10 @@
       if (state.puttsAll) {
         if (state.view === 'shots') $('out').innerHTML = '<div class="summary"><span class="meta">Select a single round to see shot-by-shot detail.</span></div>';
         else renderPuttsAll();
-        return;
+      } else {
+        (state.view === 'shots' ? renderShots : renderPutts)();
       }
-      (state.view === 'shots' ? renderShots : renderPutts)();
+      updateFreshBar();
     }
 
     // --- session cache: completed rounds only; live round always re-fetched ---
@@ -825,6 +852,21 @@
         <button class="ibtn refresh-btn" type="button" title="Re-fetch from source">${icon('refresh')} refresh</button>
         <button class="ibtn copylink-btn" type="button" title="Copy a shareable link">${icon('link')} copy link</button></div>`;
     }
+    // the freshness bar lives in the top-right (viewbar) slot, shared by all
+    // views; pick the timestamp for whatever's currently shown.
+    function freshTs() {
+      if (state.puttsAll) {
+        const ts = Object.values(state.puttsAllTs || {}).filter(Boolean);
+        return ts.length ? Math.min(...ts) : null;
+      }
+      return state.view === 'shots' ? state.shotsTs : state.puttsTs;
+    }
+    function updateFreshBar() {
+      const ts = freshTs();
+      const el = $('status');
+      el.className = '';
+      el.innerHTML = ts ? asOfBar(ts) : '';
+    }
 
     async function loadShots(opts = {}) {
       const force = !!opts.force;
@@ -851,8 +893,6 @@
           state.shots = state.putts = null;
           setLoadMeta(entries.filter(Boolean).map(e => e.source));
           renderView();
-          const n = rounds.filter(r => state.puttsAll[r] && (state.puttsAll[r].holes || []).some(scoredHole)).length;
-          status(`Loaded ${n} round${n === 1 ? '' : 's'} in ${state.loadMs} ms.`);
         } else {
           let useRound = rnd;
           let [sE, pE] = await Promise.all([
@@ -878,7 +918,6 @@
           state.puttsAll = null; state.puttsAllTs = null;
           setLoadMeta([sE.source, pE.source]);
           renderView();
-          status(`Loaded round ${useRound} · ${(sE.data.holes || []).length} holes in ${state.loadMs} ms.`);
         }
         syncUrl();
       } catch (e) {
@@ -930,7 +969,7 @@
     $('go').addEventListener('click', () => loadShots());
     document.querySelectorAll('.rnav').forEach(b => b.addEventListener('click', () => stepRound(Number(b.dataset.step))));
     $('round').addEventListener('change', updateRoundNav);
-    $('out').addEventListener('click', (e) => {
+    document.addEventListener('click', (e) => {
       const copyBtn = e.target.closest('.copylink-btn');
       if (copyBtn) { copyLink(copyBtn); return; }
       if (e.target.closest('.refresh-btn')) loadShots({ force: true });

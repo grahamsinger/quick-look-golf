@@ -38,13 +38,17 @@ dark-slate + green look):
   `fetchedAt` when it pulls from PGA and returns it (`X-Data-Fetched-At` header);
   the browser shows that instead of its own fetch time, so a cached completed
   round shows a stable capture time, not "now" on every load.
-- **"Holed from off green"** wording for chip-ins, capped so it wraps within a
-  fixed-width column and keeps the Front/Back nines symmetric.
+- Off-green hole-outs read **"holed out"** (single line, keeps the nines
+  symmetric); the **starting hole** is marked with a tee flag + noted in the summary.
+- **Shots view → comparison matrix** — rows = holes (play order), columns = shot
+  number, so a column reads straight down for comparison (e.g. every tee-shot
+  ball speed). Each cell = ball speed (full swings) or distance (putts/chips)
+  over the color-coded result location; par-3 tee shots flagged.
+- **Freshness bar consolidated** into the top-right of the view-toggle row
+  (replacing the redundant "Loaded round…" status); with the earlier compression,
+  the daily scorecard now fits all 18 holes without scrolling.
 
 Still open (design):
-- **Shots view density** — make it more table-like; the per-hole cards show too
-  little at once. Needs a defined column set (hole, shot #, from → to, distance,
-  to-pin, ball/club speed, launch, spin, apex). Design TBD with the user.
 - **Player & round dropdowns → custom comboboxes** — both are still native
   `<select>`s that render the raw OS list, which looks jarring next to the styled
   tournament combobox. Give them the same treatment (share the combobox
