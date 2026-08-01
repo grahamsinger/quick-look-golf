@@ -29,9 +29,10 @@ Then open:
 
 ### Shot Explorer — "Fairway"
 
-A dependency-free (vanilla JS) single page with a light **editorial "Fairway"
-theme** and a **dark mode** — sun/moon toggle (top right) that remembers your
-choice and follows the system default. Self-hosted Fraunces display serif.
+A dependency-free vanilla-JS app — **native ES modules, no bundler or build
+step** — with a light **editorial "Fairway" theme** and a **dark mode** —
+sun/moon toggle (top right) that remembers your choice and follows the system
+default. Self-hosted Fraunces display serif.
 
 - **Controls:** season, a **searchable tournament combobox** (dates + a "LIVE"
   badge on the in-progress event; opens *sticky to the current selection*), a
@@ -89,7 +90,14 @@ when the payload was captured from PGA — drives the UI's "data current as of")
 ```
 pga/client.py            PGATourClient: query(), introspect(), shot_details(), key discovery
 pga/server.py            FastAPI app (Shot Explorer + GraphiQL + passthrough proxy)
-static/                  index.html (explorer), graphiql.html, favicon.svg, fonts/
+static/index.html        the explorer shell (markup only)
+static/css/fairway.css   the whole stylesheet (light + dark themes)
+static/js/               native ES modules, no build step:
+  main.js                  entry point — wiring + boot
+  dom.js · icons.js · theme.js · format.js · state.js · api.js
+  pickers/               tournament.js · round.js · player.js
+  views/                 render.js · putts.js · puttsAll.js · shots.js · freshness.js
+static/                  also: graphiql.html, favicon.svg, fonts/
 start.sh / stop.sh       run/stop the web app
 scripts/dump_schema.py   dump the live schema -> schema/schema.{json,graphql}
 scripts/example_shots.py pull + print shot-by-shot data for a player/round

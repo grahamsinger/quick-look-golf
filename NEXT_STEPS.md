@@ -103,6 +103,15 @@ dark-slate + green look):
   R1 → … → Rmax → All rounds (when the view offers it), so All rounds is
   reachable by arrow; ends disable at the sequence bounds.
 
+- **Front-end modularized (Aug 2026)** — the 1,300-line `index.html` is now
+  `static/css/fairway.css` + native ES modules under `static/js/` (dom, icons,
+  theme, format, state, api, `pickers/`, `views/`, main). **Deliberately no
+  bundler/framework** — browsers load `<script type="module">` natively,
+  FastAPI serves it as-is, and the app keeps its zero-dependency character.
+  A mechanical move (code unchanged); circular imports (api ↔ pickers) are
+  safe because all cross-calls happen at event time, not module-eval time.
+  Revisit Vite/etc. only if a real library (e.g. d3) becomes necessary.
+
 Still open (design):
 - Responsive / mobile layout.
 - Player picker refinements as they come up (density, maybe headshots?).

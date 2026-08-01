@@ -1,0 +1,344 @@
+/* Fairway — the app's entire stylesheet (light + dark themes). */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-var.woff2') format('woff2');
+}
+:root {
+  --serif: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* surfaces — warm paper */
+  --paper: #F2ECDF; --paper-2: #EAE1D0; --card: #FBF8F1; --card-2: #F6F0E5;
+  --line: #E4DBC9; --line-2: #D3C8B2;
+  /* ink — deep pine neutrals */
+  --ink: #16342A; --ink-2: #4B5A50; --ink-3: #828B7E; --charcoal: #33382F;
+  /* brand + accents */
+  --pine: #1C4A34; --pine-2: #256B45; --fairway: #2F7D4F;
+  --sand: #B5862B; --sand-2: #CDA968;
+  --flag: #B23A2B; --flag-2: #C34C3B;
+  --flag-tint: #F4E2DB; --turf: #E7EDD9;
+  /* score-to-par text (WCAG-safe on paper) */
+  --good: #1E6B3F; --neutral: #4B5A50; --warn: #8A6414; --bad: #A5301F;
+  /* proximity-vs-expectation ink (deeper than --good so it reads on the green tint) */
+  --prox-hot: #17593A; --prox-cold: #A5301F;
+  /* focus ring + status tint fills (tokenized so dark mode can override) */
+  --focus-ring: rgba(28,74,52,.16);
+  --tint-good: rgba(47,125,79,.09); --tint-good-2: rgba(47,125,79,.16);
+  --tint-bad: rgba(178,58,43,.09); --tint-bad-2: rgba(178,58,43,.15);
+  --tint-warn-2: rgba(181,134,43,.17);
+
+  --r-sm: 7px; --r: 10px; --r-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(22,52,42,.06);
+  --shadow: 0 1px 2px rgba(22,52,42,.05), 0 12px 28px -16px rgba(22,52,42,.22);
+}
+/* dark theme — a warm clubhouse-at-dusk palette (its own steps, CVD-validated) */
+:root[data-theme="dark"] {
+  --paper: #12140E; --paper-2: #0D0F0A; --card: #1A1D15; --card-2: #21251A;
+  --line: #2C3126; --line-2: #3C4230;
+  --ink: #ECE7D6; --ink-2: #B4B4A0; --ink-3: #838A79; --charcoal: #6B7160;
+  --pine: #2F9257; --pine-2: #38A863; --fairway: #4FB477;
+  --sand: #D8B45E; --sand-2: #C6A468;
+  --flag: #E56C52; --flag-2: #EC8370; --flag-tint: #2C1C17; --turf: #1B2416;
+  --good: #46B873; --neutral: #B4B4A0; --warn: #F0CB4A; --bad: #EC6247;
+  --prox-hot: #55C689; --prox-cold: #EC6247;
+  --focus-ring: rgba(79,180,119,.26);
+  --tint-good: rgba(70,184,115,.15); --tint-good-2: rgba(70,184,115,.24);
+  --tint-bad: rgba(236,98,71,.15); --tint-bad-2: rgba(236,98,71,.24);
+  --tint-warn-2: rgba(240,203,74,.20);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
+  --shadow: 0 1px 2px rgba(0,0,0,.45), 0 14px 30px -16px rgba(0,0,0,.75);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 14px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+b, strong { font-weight: 640; }
+.ic { width: 1em; height: 1em; flex: none; vertical-align: -0.14em; }
+
+/* ---------- header ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 24px; background: var(--card);
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20;
+}
+.brand { display: flex; align-items: center; gap: 11px; text-decoration: none; color: inherit; }
+.brand-mark { width: 30px; height: 30px; flex: none; }
+.brand-mark svg { width: 100%; height: 100%; display: block; }
+.brand-txt { display: flex; flex-direction: column; line-height: 1; }
+.wordmark {
+  font-family: var(--serif); font-weight: 600; font-variation-settings: 'opsz' 144;
+  font-size: 23px; letter-spacing: -.012em; color: var(--ink);
+}
+.tagline {
+  font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: 5px; font-weight: 650;
+}
+.spacer { flex: 1; }
+.topnav { display: flex; gap: 4px; }
+.topnav a {
+  display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2);
+  text-decoration: none; font-size: 12.5px; font-weight: 550;
+  padding: 6px 10px; border-radius: var(--r-sm);
+}
+.topnav a:hover { background: var(--paper-2); color: var(--ink); }
+.topnav a .ic { color: var(--ink-3); }
+.topnav-btn { display: inline-flex; align-items: center; justify-content: center; background: transparent;
+  border: 1px solid transparent; color: var(--ink-2); cursor: pointer; padding: 7px; border-radius: var(--r-sm); margin-right: 4px; }
+.topnav-btn:hover { background: var(--paper-2); color: var(--ink); }
+.topnav-btn .ic { width: 16px; height: 16px; }
+
+/* ---------- toolbar ---------- */
+.toolbar {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+  padding: 16px 24px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .11em;
+  color: var(--ink-3); font-weight: 700; padding-left: 2px;
+}
+input, select, button { font-family: inherit; }
+input[type=text], #year, select {
+  background: var(--card-2); color: var(--ink);
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 9px 12px; font-size: 13.5px; height: 40px;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+input:focus, select:focus {
+  outline: none; border-color: var(--pine);
+  box-shadow: 0 0 0 3px var(--focus-ring); background: var(--card);
+}
+#year { width: 78px; text-align: center; font-variant-numeric: tabular-nums; }
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-wrap .search-ic { position: absolute; left: 11px; color: var(--ink-3); pointer-events: none; }
+.input-wrap #tournInput { padding-left: 33px; min-width: 280px; max-width: 400px; width: 100%; }
+.select-wrap { position: relative; display: flex; align-items: center; }
+.select-wrap select { appearance: none; -webkit-appearance: none; padding-right: 32px; width: 100%; }
+.select-wrap .chev { position: absolute; right: 11px; color: var(--ink-3); pointer-events: none; }
+/* player picker: a leaderboard panel — chips ordered by position, ties grouped */
+.player-combo { position: relative; min-width: 235px; }
+.player-btn { max-width: 340px; }
+.player-btn #playerBtnLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);
+  box-shadow: var(--shadow); padding: 10px; width: min(720px, calc(100vw - 48px)); }
+.pfilter-wrap { margin-bottom: 10px; }
+.pfilter-wrap #playerFilter { width: 100%; padding-left: 33px; height: 36px; }
+/* two-column grid: a right-aligned position rail | the tie group's chips */
+.player-board { max-height: 380px; overflow-y: auto; display: grid;
+  grid-template-columns: max-content 1fr; align-items: start; gap: 9px 12px; padding: 2px; }
+.pgchips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.pgpos { font-size: 10.5px; font-weight: 800; color: var(--sand); letter-spacing: .02em;
+  font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; padding-top: 7px; }
+.pgpos.out, .pgchips.out .pchip { opacity: .6; }
+.pgpos.out { color: var(--ink-3); }
+.pchip { display: inline-flex; align-items: baseline; gap: 7px; background: var(--card-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 18px; padding: 4px 12px 5px; font-size: 12.5px;
+  font-family: inherit; cursor: pointer; line-height: 1.35; }
+.pchip:hover { border-color: var(--pine); background: var(--card); }
+.pchip .pscore { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink-3); font-weight: 640; }
+.pchip .pscore.under { color: var(--good); } .pchip .pscore.over { color: var(--bad); }
+/* daily progress slot: tee time · "thru N" · final round score */
+.pchip .pprog { border-left: 1px solid var(--line-2); padding-left: 8px; margin-left: 1px;
+  font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pchip.sel { background: var(--pine); border-color: var(--pine); color: #F4EFE2; }
+.pchip.sel .pscore, .pchip.sel .pscore.under, .pchip.sel .pscore.over { color: rgba(244,239,226,.8); }
+.pchip.sel .pprog { color: rgba(244,239,226,.66); border-left-color: rgba(244,239,226,.3); }
+.pchip.active { outline: 2px solid var(--pine); outline-offset: 1px; }
+.pcut { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; color: var(--ink-3);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; margin: 6px 0 0; }
+.pcut::before, .pcut::after { content: ""; height: 1px; background: var(--line-2); flex: 1; }
+.pempty { grid-column: 1 / -1; color: var(--ink-3); padding: 6px; }
+/* round picker: custom styled dropdown (matches the tournament combobox) */
+.round-combo { position: relative; min-width: 138px; }
+.round-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+  background: var(--card-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 9px 12px; height: 40px; font-size: 13.5px; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
+.round-btn:hover { background: var(--card); }
+.round-btn[aria-expanded="true"] { border-color: var(--pine); box-shadow: 0 0 0 3px var(--focus-ring); background: var(--card); }
+.round-btn .chev { color: var(--ink-3); flex: none; }
+.round-menu { min-width: 100%; }
+.round-menu li.sel:not(.active) { color: var(--pine); font-weight: 640; }
+.round-nav { display: flex; align-items: center; gap: 6px; }
+.rnav { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 40px;
+  background: var(--card-2); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; padding: 0; }
+.rnav:hover:not(:disabled) { background: var(--card); color: var(--pine); border-color: var(--pine); }
+.rnav:disabled { opacity: .38; cursor: default; }
+.rnav .ic { width: 15px; height: 15px; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+  background: var(--pine); color: #F4EFE2; border: 1px solid var(--pine);
+  border-radius: var(--r); padding: 0 18px; height: 40px;
+  font-size: 13.5px; font-weight: 600; cursor: pointer;
+  box-shadow: var(--shadow-sm); transition: background .12s, transform .04s;
+}
+.btn-primary:hover { background: var(--pine-2); border-color: var(--pine-2); }
+.btn-primary:active { transform: translateY(1px); }
+.btn-primary:disabled { opacity: .5; cursor: default; }
+
+/* searchable tournament combobox */
+.combo { position: relative; }
+.combo-list {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; margin: 0; padding: 5px; list-style: none;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);
+  width: max-content; min-width: 280px; max-width: 460px; max-height: 340px; overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+.combo-list li {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  padding: 8px 11px; border-radius: var(--r-sm); font-size: 13px; cursor: pointer; white-space: nowrap; color: var(--ink-2);
+}
+.combo-list li .tlabel { overflow: hidden; text-overflow: ellipsis; }
+.combo-list li:hover:not(.active) { background: var(--paper-2); color: var(--ink); }
+.combo-list li.sel:not(.active) { color: var(--pine); font-weight: 640; }
+.combo-list li.active { background: var(--pine); color: #F4EFE2; }
+.combo-list li.live:not(.active) { background: var(--flag-tint); }
+.live-badge {
+  flex: none; font-size: 9px; font-weight: 800; letter-spacing: .05em; color: #fff;
+  background: var(--flag); padding: 2px 7px; border-radius: 20px; text-transform: uppercase;
+}
+.live-badge::before { content: "●"; font-size: 7px; vertical-align: 1.5px; margin-right: 3px; }
+.combo-list li.active .live-badge { background: #F4EFE2; color: var(--flag); }
+.combo-empty { color: var(--ink-3); padding: 9px 11px; }
+
+/* status line */
+#status { margin-left: auto; display: flex; justify-content: flex-end; align-items: center; color: var(--ink-3); font-size: 12.5px; padding-left: 16px; min-height: 36px; }
+#status.err { color: var(--flag); }
+#status .asof { margin: 0; }
+
+/* view toggle */
+.viewbar { display: flex; align-items: center; gap: 18px; padding: 12px 24px 0; flex-wrap: wrap; }
+.seg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 3px; gap: 2px; }
+.segbtn {
+  display: inline-flex; align-items: center; gap: 7px; background: transparent; color: var(--ink-2);
+  border: none; border-radius: var(--r-sm); padding: 7px 15px; font-size: 13px; cursor: pointer; font-weight: 600;
+}
+.segbtn .ic { color: var(--ink-3); }
+.segbtn:hover:not(.active) { color: var(--ink); }
+.segbtn.active { background: var(--card); color: var(--pine); box-shadow: var(--shadow-sm); }
+.segbtn.active .ic { color: var(--pine); }
+
+main { padding: 6px 24px 56px; max-width: 1200px; }
+.summary { margin: 10px 0 8px; display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; }
+.summary .who { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
+.summary .meta { color: var(--ink-3); font-size: 13px; }
+.summary .meta b { color: var(--ink-2); }
+
+/* freshness bar */
+.asof {
+  display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ink-3); font-size: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 5px 8px 5px 13px; margin: 0 0 10px;
+}
+.asof .clock { color: var(--sand); }
+.asof b { color: var(--ink); font-weight: 600; }
+.asof .loadms { color: var(--ink-3); cursor: help; }
+.asof .sep { width: 1px; height: 14px; background: var(--line-2); }
+.ibtn {
+  display: inline-flex; align-items: center; gap: 5px; background: var(--paper-2); color: var(--ink-2);
+  border: 1px solid var(--line-2); border-radius: 16px; padding: 4px 11px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.ibtn:hover { background: var(--card-2); color: var(--pine); border-color: var(--pine); }
+.ibtn:disabled { opacity: .5; cursor: default; }
+.ibtn .ic { color: var(--ink-3); } .ibtn:hover .ic { color: var(--pine); }
+
+/* ---------- shots comparison matrix ---------- */
+.card.shotmatrix { padding: 4px 6px 12px; }
+table.shots { border-collapse: collapse; width: auto; }
+table.shots th, table.shots td { padding: 7px 13px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; font-size: 13px; }
+table.shots thead th { color: var(--ink-3); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; border-bottom: 1.5px solid var(--line-2); vertical-align: bottom; }
+table.shots thead th.scol { color: var(--sand); }
+table.shots tbody tr:last-child td { border-bottom: none; }
+table.shots td.hole { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; font-size: 15px; color: var(--ink); }
+table.shots td.spar, table.shots th.spar-h { text-align: center; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+table.shots td.scell { vertical-align: top; }
+.sc-v { display: block; font-variant-numeric: tabular-nums; font-weight: 640; color: var(--ink); font-size: 13.5px; line-height: 1.15; }
+.sc-v .sc-u { font-weight: 400; color: var(--ink-3); font-size: 10px; margin-left: 2px; }
+.sc-r { display: block; font-size: 10.5px; margin-top: 1px; color: var(--ink-3); }
+.sc-r.r-good { color: var(--good); } .sc-r.r-warn { color: var(--warn); } .sc-r.r-bad { color: var(--bad); }
+sup.p3 { color: var(--sand); font-size: 8px; font-weight: 800; margin-left: 3px; vertical-align: super; }
+table.shots td.sscore { text-align: center; }
+.caphint b.rg-good { color: var(--good); } .caphint b.rg-warn { color: var(--warn); } .caphint b.rg-bad { color: var(--bad); }
+
+/* ---------- first-putts card + tables ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm); padding: 4px 20px 14px; margin-bottom: 18px; display: inline-block;
+  max-width: 100%; overflow-x: auto; }
+/* daily view: front nine | back nine, scorecard style */
+.card.scorecard { display: inline-flex; align-items: flex-start; padding: 6px 8px 12px; }
+.scorecard .nine { padding: 0 12px; }
+.scorecard .nine + .nine { border-left: 1px solid var(--line); }
+.scorecard table.putts th, .scorecard table.putts td { padding: 6px 14px; }
+/* reserve the tee-flag slot in every hole cell so the start marker never
+   widens one nine's Hole column (keeps Front/Back symmetric) */
+.hole .startslot { display: inline-block; width: 15px; text-align: center; }
+.hole .teeflag { width: 11px; height: 11px; vertical-align: -1px; }
+/* feet of putts made / avg first putt strips (all-rounds view) */
+.madestrip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 14px; margin: 2px 0 12px; font-size: 12.5px; color: var(--ink-3); }
+.madestrip .ms-lbl { font-weight: 650; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+.madestrip .ms-item { font-variant-numeric: tabular-nums; }
+.madestrip .ms-item b { color: var(--ink); font-weight: 640; }
+.madestrip .ms-total { padding-left: 10px; border-left: 1px solid var(--line-2); }
+.madestrip .ms-total b { color: var(--pine); }
+/* shortest missed putts */
+.misspanel { margin: 2px 0 10px; }
+.misspanel-hd { font-size: 12px; font-weight: 650; color: var(--ink-2); margin: 0 0 7px 2px; letter-spacing: .01em; }
+.misspanel-hd .misspanel-sub { color: var(--ink-3); font-weight: 400; }
+.misstiles { display: flex; flex-wrap: wrap; gap: 9px; }
+.misstile { background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-sm); padding: 7px 13px 8px; min-width: 116px; display: flex; flex-direction: column; gap: 3px; }
+.mt-len { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 600; font-size: 20px;
+  line-height: 1; font-variant-numeric: tabular-nums; }
+.mt-len .mt-unit { font-family: var(--sans); font-size: 12px; font-weight: 500; margin-left: 3px; color: var(--ink-3); }
+.mt-meta { font-size: 11.5px; color: var(--ink-3); }
+.mt-res { margin-top: 1px; }
+
+.caphint { color: var(--ink-3); font-size: 12px; margin: 8px 2px 9px; line-height: 1.55; }
+.caphint b { color: var(--ink-2); }
+.caphint b.made { color: var(--good); } .caphint b.tp { color: var(--bad); }
+
+table.putts { border-collapse: collapse; width: auto; }
+table.putts th, table.putts td { text-align: left; padding: 9px 20px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+table.putts thead th { color: var(--ink-3); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .09em; border-bottom: 1.5px solid var(--line-2); }
+table.putts tbody tr:last-child td { border-bottom: none; }
+table.putts td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.putts .dist { font-variant-numeric: tabular-nums; }
+table.putts td.hole { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; font-size: 15px; color: var(--ink); }
+table.putts tbody tr.made { background: var(--tint-good); }
+table.putts tbody tr.threeputt { background: var(--tint-bad); }
+/* proximity vs tour-average expectation (color never alone: paired with ▴/▾) */
+.q-hot { color: var(--prox-hot); font-weight: 700; }
+.q-cold { color: var(--prox-cold); font-weight: 640; }
+.qg { font-size: 9.5px; vertical-align: 1.5px; margin-left: 1px; }
+.hgs { color: var(--sand); }  /* greenside-origin "had" (chip/pitch, not a full approach) */
+.made-yes { color: var(--good); } .made-no { color: var(--bad); font-weight: 640; } .made-na { color: var(--ink-3); }
+.putts-cnt { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; align-items: center; padding: 2px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 650; letter-spacing: .01em; }
+.pill.birdie { background: var(--tint-good-2); color: var(--good); }
+.pill.par { background: var(--paper-2); color: var(--ink-2); }
+.pill.bogey { background: var(--tint-warn-2); color: var(--warn); }
+.pill.double { background: var(--tint-bad-2); color: var(--bad); }
+
+/* matrix */
+.mxkey { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; color: var(--ink-3); font-size: 12px; margin: 14px 2px 14px; }
+.mxkey .kgrp { display: inline-flex; align-items: center; gap: 8px; }
+.mxkey .kt { text-transform: uppercase; letter-spacing: .09em; font-size: 9.5px; font-weight: 700; opacity: .85; }
+.mxkey .ksw { width: 22px; height: 16px; border-radius: 4px; border: 1px solid var(--line-2); display: inline-flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; }
+.mxkey .ksw.made { background: var(--tint-good-2); color: var(--good); }
+.mxkey .ksw.threeputt { background: var(--tint-bad-2); color: var(--bad); }
+.mxkey .knum { font-weight: 700; }
+table.putts td.mx { text-align: right; min-width: 54px; font-variant-numeric: tabular-nums; line-height: 1.18; }
+table.putts td.mx.made { background: var(--tint-good); }
+table.putts td.mx.threeputt { background: var(--tint-bad); }
+table.putts td.mx .og { color: var(--ink-3); }
+.mx .mput { display: block; font-weight: 640; font-size: 14px; }
+.mx .mappr { display: block; font-size: 9.5px; font-weight: 500; color: var(--ink-3); }
+table.putts td.mxgap, table.putts th.mxgap { width: 20px; border: none; padding: 0; }
+table.putts th.mxhdr { text-align: center; color: var(--sand); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border-bottom: none; padding-bottom: 3px; }
