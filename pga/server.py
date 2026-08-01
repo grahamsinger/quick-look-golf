@@ -266,6 +266,7 @@ def putts(
         response.headers["X-Data-Fetched-At"] = str(fetched_at)
     rows = []
     missed_putts = []  # every putt that didn't hole out, for "shortest missed"
+    made_putt_feet = 0.0  # total length of putts holed (ShotLink "feet of putts made")
     for h in data["holes"]:
         strokes = h["strokes"]
 
@@ -314,6 +315,12 @@ def putts(
                     "scoreToPar": diff,
                 }
             )
+        # length of the putt that holed out (the made putt), for feet-of-putts-made
+        if green_idxs:
+            holed = green_idxs[-1]
+            made_len = _parse_feet(strokes[holed - 1].get("distanceRemaining")) if holed > 0 else None
+            if made_len is not None:
+                made_putt_feet += made_len
         rows.append(
             {
                 "hole": h["holeNumber"],
@@ -338,13 +345,16 @@ def putts(
         "avgFirstPuttFt": round(sum(fps) / len(fps), 1) if fps else None,
         "holesHoledOffGreen": sum(1 for r in rows if r["holedOffGreen"]),
     }
-    # shortest missed putts first (tie-break by hole for stable ordering)
+    # shortest missed putts first (tie-break by hole for stable ordering). Return
+    # the round's top 10 — enough for the daily view (top 5) and for the all-rounds
+    # view to aggregate a correct tournament top 10 across rounds.
     missed_putts.sort(key=lambda m: (m["lengthFt"], m["hole"]))
     return {
         "round": data["round"],
         "holes": rows,
         "summary": summary,
-        "shortestMissed": missed_putts[:5],
+        "shortestMissed": missed_putts[:10],
+        "madePuttFeet": round(made_putt_feet, 1),
     }
 
 

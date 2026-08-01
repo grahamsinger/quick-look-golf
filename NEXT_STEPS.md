@@ -47,6 +47,11 @@ dark-slate + green look):
 - **Freshness bar consolidated** into the top-right of the view-toggle row
   (replacing the redundant "Loaded round…" status); with the earlier compression,
   the daily scorecard now fits all 18 holes without scrolling.
+- **All-rounds tournament putting stats** — "feet of putts made" per round + a
+  tournament total (ShotLink stat: the length of every putt holed; a 2-putt
+  contributes the tap-in, not the lag), and the **10 shortest missed putts across
+  the tournament** (round-tagged). Server returns each round's top-10 misses +
+  `madePuttFeet`; the client aggregates.
 
 Still open (design):
 - **Player & round dropdowns → custom comboboxes** — both are still native
