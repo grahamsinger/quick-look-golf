@@ -22,12 +22,30 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   - **Per-hole zoom** — click a hole chip to crop to that hole. The assets
     exist: per-hole `terrain/terrain{NN}.jpg` + `terrain{NN}.tfw` +
     `terrain/cutouts/{hole}.png` on the same host, and `courseData.json`'s
-    `holeCenterLines` give crop boxes/orientation.
-  - **Multi-round overlay** — same hole, all 4 rounds' trails (tee-shot
+    `holeCenterLines` give crop boxes/orientation. The round picker should
+    behave like the rest of the app: **round-by-round OR "All rounds"**
+    (the selected player's trails from every round overlaid — tee-shot
     dispersion at a glance).
+  - **Full-field per-hole overlay** — round-by-round, every player on one
+    hole. **The data problem is already solved**: the schema's
+    `scatterData(tournamentId, course, hole)` returns, in ONE query, every
+    player's shot locations for ALL rounds of that hole — grouped by stroke
+    number, with player name, hole result (BIRDIE/PAR/…), tourcast coords
+    (same space as our projection; use
+    `shotCoords.overview.landscapeCoords.tourcastX/Y`), and each round's
+    pin position. Verified live (hole 15 R2026524: ~280 shots/round). So:
+    no separate storage — just a `/api/scatter` proxy cached in Redis like
+    everything else (permanent once the tournament completes, short TTL
+    live). Render as **ending-location dots** (not trails) colored by
+    result, with a stroke-number filter (stroke 1 = driving dispersion,
+    stroke 2 on a par 4 = approach scatter); the per-round pin makes
+    "vs that day's pin" readable. `scatterDataCompressed` exists too
+    (base64-gzip `payload`, `pga.decode_payload` already handles it) if
+    the raw query gets heavy.
   - Shot dots could encode result quality (colors from the shots matrix).
   - Multi-course events (e.g. AmEx) may need per-courseId `courseOffset`
-    from the config (the app supports a `courseOffset` array).
+    from the config (the app supports a `courseOffset` array), and
+    `scatterData` takes a `course` arg — get courseId from `courseStats`.
   - `holeDetails.statsSummary` (birdie% + rank) could power a hole-difficulty
     strip on the aerial.
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*
