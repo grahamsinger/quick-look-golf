@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>golf_api — Shot Explorer</title>
+  <style>
+    :root {
+      --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a;
+      --fg: #e7ebf0; --muted: #8b93a1; --accent: #4ade80; --accent2: #38bdf8;
+      --putt: #38bdf8; --stroke: #fbbf24; --penalty: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    header {
+      display: flex; align-items: center; gap: 16px; padding: 14px 20px;
+      border-bottom: 1px solid var(--line); background: var(--panel);
+      position: sticky; top: 0; z-index: 5;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+    header .sub { color: var(--muted); font-size: 12px; }
+    header .spacer { flex: 1; }
+    header a { color: var(--accent2); text-decoration: none; margin-left: 14px; font-size: 13px; }
+    header a:hover { text-decoration: underline; }
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: end;
+      padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+    select, input, button {
+      background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+      border-radius: 8px; padding: 8px 10px; font-size: 13px; min-width: 90px;
+    }
+    select { min-width: 200px; max-width: 340px; }
+    button {
+      background: var(--accent); color: #05130a; border: none; font-weight: 650;
+      cursor: pointer; min-width: 120px;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    /* searchable tournament combobox */
+    .combo { position: relative; }
+    #tournInput { min-width: 260px; max-width: 380px; }
+    .combo-list {
+      position: absolute; top: 100%; left: 0; z-index: 30; margin-top: 4px; padding: 4px; list-style: none;
+      background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+      width: max-content; min-width: 260px; max-width: 460px; max-height: 320px; overflow-y: auto;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, .5);
+    }
+    .combo-list li {
+      display: flex; align-items: center; gap: 10px; justify-content: space-between;
+      padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;
+    }
+    .combo-list li .tlabel { overflow: hidden; text-overflow: ellipsis; }
+    .combo-list li.active { background: var(--accent); color: #05130a; }
+    .combo-list li:hover:not(.active) { background: var(--line); }
+    .combo-list li.sel:not(.active) { color: var(--accent); font-weight: 650; }
+    .combo-list li.live:not(.active) { background: rgba(248, 113, 113, 0.12); }
+    .live-badge {
+      flex: none; font-size: 9.5px; font-weight: 800; letter-spacing: .4px; color: #fff;
+      background: var(--penalty); padding: 1px 6px; border-radius: 10px;
+    }
+    .live-badge::before { content: "● "; }
+    .combo-list li.active .live-badge { background: #05130a; color: var(--accent); }
+    .combo-empty { color: var(--muted); padding: 8px 10px; }
+    #status { padding: 10px 20px; color: var(--muted); font-size: 13px; min-height: 20px; }
+    #status.err { color: var(--penalty); }
+    main { padding: 8px 20px 60px; }
+    .summary { color: var(--muted); margin: 6px 0 18px; }
+    .summary b { color: var(--fg); }
+    .holes { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+    .hole {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .hole-hd {
+      display: flex; align-items: baseline; gap: 10px; padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .hole-hd .num { font-size: 18px; font-weight: 700; }
+    .hole-hd .meta { color: var(--muted); font-size: 12px; }
+    .hole-hd .score { margin-left: auto; font-weight: 700; font-size: 15px; }
+    .hole-body { display: flex; gap: 12px; padding: 12px 14px; }
+    .plot { flex: 0 0 150px; }
+    .plot svg { width: 150px; height: 150px; background: #0c1a12; border-radius: 8px; border: 1px solid var(--line); }
+    .noplot { display: flex; align-items: center; justify-content: center; height: 150px; width: 150px;
+      color: var(--muted); font-size: 11px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
+    .strokes { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .strk { border-left: 3px solid var(--stroke); padding-left: 9px; }
+    .strk.putt { border-color: var(--putt); }
+    .strk.penalty { border-color: var(--penalty); }
+    .strk .pbp { font-size: 13px; }
+    .strk .loc { color: var(--muted); font-size: 11px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+    .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+      padding: 1px 6px; font-size: 10.5px; color: var(--muted); }
+    .chip b { color: var(--fg); font-weight: 600; }
+    .legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; margin: 4px 0 16px; }
+    .legend span::before { content: "●"; margin-right: 4px; }
+    .lg-stroke::before { color: var(--stroke); } .lg-putt::before { color: var(--putt); }
+    .lg-tee::before { content: "▲" !important; color: var(--accent); }
+    .lg-cup::before { content: "◎" !important; color: #fff; }
+
+    /* view toggle */
+    .viewbar { display: flex; align-items: center; gap: 16px; padding: 10px 20px 0; flex-wrap: wrap; }
+    .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+    .segbtn { background: transparent; color: var(--muted); border: none; border-radius: 7px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer; min-width: 0; font-weight: 600; }
+    .segbtn.active { background: var(--accent); color: #05130a; }
+
+    /* putts view */
+    .stat-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 96px; }
+    .stat .v { font-size: 20px; font-weight: 700; }
+    .stat .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+    .lanewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; overflow-x: auto; }
+    .lanewrap h3 { margin: 0 0 4px; font-size: 14px; } .lanewrap .cap { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .lanewrap svg { width: 100%; min-width: 560px; height: auto; display: block; }
+    table.putts { border-collapse: collapse; width: auto; }
+    table.putts th, table.putts td { text-align: left; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+    table.putts th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+    table.putts td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.putts tbody tr.made { background: rgba(74, 222, 128, 0.09); }
+    table.putts tbody tr.made td { font-weight: 650; }
+    table.putts tbody tr.made td.dist { color: var(--accent); }
+    table.putts tbody tr.threeputt { background: rgba(248, 113, 113, 0.11); }
+    table.putts tbody tr.threeputt td.dist { color: var(--penalty); font-weight: 650; }
+    .caphint { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
+    .caphint b.made { color: var(--accent); font-weight: 650; }
+    .caphint b.tp { color: var(--penalty); font-weight: 650; }
+    /* matrix key */
+    .mxkey { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; color: var(--muted); font-size: 12px; margin: 4px 0 14px; }
+    .mxkey .kgrp { display: inline-flex; align-items: center; gap: 8px; }
+    .mxkey .kt { text-transform: uppercase; letter-spacing: .4px; font-size: 10px; opacity: .75; }
+    .mxkey .ksw { width: 22px; height: 15px; border-radius: 4px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #05130a; }
+    .mxkey .ksw.made { background: rgba(74, 222, 128, 0.85); }
+    .mxkey .ksw.threeputt { background: rgba(248, 113, 113, 0.85); }
+    .mxkey .knum { font-weight: 700; }
+    /* all-rounds matrix */
+    table.putts td.mx { text-align: right; min-width: 52px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+    table.putts td.mx.made { background: rgba(74, 222, 128, 0.14); font-weight: 650; }
+    table.putts td.mx.threeputt { background: rgba(248, 113, 113, 0.16); font-weight: 650; }
+    table.putts td.mx .og { color: var(--muted); }
+    .mx .mput { display: block; }
+    .mx .mappr { display: block; font-size: 9.5px; font-weight: 400; color: var(--muted); }
+    table.putts td.mxgap, table.putts th.mxgap { width: 22px; border: none; padding: 0; }
+    table.putts th.mxhdr { text-align: center; color: var(--muted); font-size: 10px; }
+    /* cache freshness bar */
+    .asof { color: var(--muted); font-size: 12px; margin: 2px 0 12px; display: inline-flex; align-items: center; gap: 8px; }
+    .asof b { color: var(--fg); font-weight: 600; }
+    .refresh-btn { background: var(--panel2); color: var(--accent2); border: 1px solid var(--line); border-radius: 6px;
+      padding: 2px 9px; font-size: 11px; font-weight: 600; cursor: pointer; min-width: 0; }
+    .refresh-btn:hover { background: var(--line); }
+    .refresh-btn:disabled { opacity: .5; cursor: default; }
+    .loadms { color: var(--muted); cursor: help; }
+    .pill { display: inline-block; padding: 1px 9px; border-radius: 20px; font-size: 12px; font-weight: 650; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>golf_api <span class="sub">· Shot Explorer</span></h1>
+    <div class="spacer"></div>
+    <a href="/graphiql">GraphiQL ↗</a>
+    <a href="/docs">REST docs ↗</a>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <label for="year">Season</label>
+      <input id="year" value="2026" size="5" style="min-width:70px" />
+    </div>
+    <div class="field combo">
+      <label for="tournInput">Tournament</label>
+      <input type="hidden" id="tourn" />
+      <input type="text" id="tournInput" autocomplete="off" spellcheck="false"
+             role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="tournList"
+             placeholder="Search tournaments…" />
+      <ul id="tournList" class="combo-list" role="listbox" hidden></ul>
+    </div>
+    <div class="field">
+      <label for="player">Player</label>
+      <select id="player"><option>pick a tournament</option></select>
+    </div>
+    <div class="field">
+      <label for="round">Round</label>
+      <select id="round">
+        <option value="1">1</option><option value="2">2</option>
+        <option value="3">3</option><option value="4">4</option>
+        <option value="all" selected>All rounds</option>
+      </select>
+    </div>
+    <button id="go">Load shots</button>
+  </div>
+
+  <div id="status"></div>
+  <div class="viewbar">
+    <div class="seg">
+      <button class="segbtn" data-view="trails">Shot trails</button>
+      <button class="segbtn active" data-view="putts">First putts</button>
+    </div>
+    <div id="legend" class="legend" style="display:none">
+      <span class="lg-tee">Tee</span>
+      <span class="lg-stroke">Stroke</span>
+      <span class="lg-putt">Putt</span>
+      <span class="lg-cup">Hole</span>
+    </div>
+  </div>
+  <main><div id="out"></div></main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const status = (msg, err = false) => { const s = $('status'); s.textContent = msg || ''; s.className = err ? 'err' : ''; };
+    const api = async (path) => { const r = await fetch(path); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json(); };
+
+    // --- tournament typeahead combobox -----------------------------------
+    let tournFiltered = [];
+    let tournActive = -1;
+
+    function tournLabel(t) {
+      const d = t.startDate
+        ? new Date(t.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+      return d ? `${d} — ${t.name}` : t.name;
+    }
+    function currentTournLabel() {
+      const t = state.tournaments.find(x => x.id === $('tourn').value);
+      return t ? tournLabel(t) : '';
+    }
+    function renderTournList(filter) {
+      const q = (filter || '').trim().toLowerCase();
+      tournFiltered = state.tournaments.filter(t => !q || tournLabel(t).toLowerCase().includes(q));
+      const selId = $('tourn').value;
+      const list = $('tournList');
+      list.innerHTML = tournFiltered.length
+        ? tournFiltered.map(t => {
+            const live = t.tournamentStatus === 'IN_PROGRESS';
+            const cls = [t.id === selId ? 'sel' : '', live ? 'live' : ''].filter(Boolean).join(' ');
+            const badge = live ? '<span class="live-badge">LIVE</span>' : '';
+            return `<li role="option" data-id="${t.id}" class="${cls}"><span class="tlabel">${tournLabel(t)}</span>${badge}</li>`;
+          }).join('')
+        : '<li class="combo-empty">No matches</li>';
+      list.hidden = false;
+      $('tournInput').setAttribute('aria-expanded', 'true');
+      tournActive = -1;
+    }
+    function closeTournList() {
+      $('tournList').hidden = true;
+      $('tournInput').setAttribute('aria-expanded', 'false');
+      tournActive = -1;
+    }
+    function setActiveTourn(i) {
+      const items = [...$('tournList').querySelectorAll('li[role=option]')];
+      if (!items.length) return;
+      tournActive = Math.max(0, Math.min(i, items.length - 1));
+      items.forEach((el, idx) => el.classList.toggle('active', idx === tournActive));
+      items[tournActive].scrollIntoView({ block: 'nearest' });
+    }
+    function selectTourn(id, opts = {}) {
+      const t = state.tournaments.find(x => x.id === id);
+      if (!t) return;
+      $('tourn').value = id;
+      $('tournInput').value = tournLabel(t);
+      closeTournList();
+      if (opts.load !== false) loadPlayers();
+    }
+    function setupTournCombo() {
+      const tin = $('tournInput');
+      tin.addEventListener('focus', () => { tin.select(); renderTournList(''); });
+      tin.addEventListener('input', () => { renderTournList(tin.value); if (tournFiltered.length) setActiveTourn(0); });
+      tin.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); if ($('tournList').hidden) renderTournList(tin.value); setActiveTourn(tournActive + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveTourn(tournActive - 1); }
+        else if (e.key === 'Enter') { e.preventDefault(); const t = tournFiltered[tournActive]; if (t) selectTourn(t.id); }
+        else if (e.key === 'Escape') { closeTournList(); tin.value = currentTournLabel(); tin.blur(); }
+      });
+      tin.addEventListener('blur', () => { setTimeout(() => { closeTournList(); tin.value = currentTournLabel(); }, 150); });
+      $('tournList').addEventListener('mousedown', (e) => {
+        const li = e.target.closest('li[role=option]');
+        if (!li) return;
+        e.preventDefault();  // keep focus, beat the blur
+        selectTourn(li.dataset.id);
+      });
+    }
+
+    async function loadTournaments(preferredId) {
+      const year = $('year').value.trim() || '2026';
+      status('Loading schedule…');
+      try {
+        const { tournaments } = await api(`/api/schedule?year=${encodeURIComponent(year)}`);
+        state.tournaments = tournaments.slice().reverse();  // most recent first
+        // preferred (deep link) → live event → most recent
+        const def = (preferredId && state.tournaments.find(t => t.id === preferredId))
+          || state.tournaments.find(t => t.tournamentStatus === 'IN_PROGRESS')
+          || state.tournaments[0];
+        if (def) selectTourn(def.id, { load: false });
+        status(`${tournaments.length} tournaments in ${year}.`);
+        await loadPlayers();
+      } catch (e) { status('Schedule failed: ' + e.message, true); }
+    }
+
+    function selectPlayer(id) {
+      const sel = $('player');
+      if (id && [...sel.options].some(o => o.value === id)) { sel.value = id; return true; }
+      return false;
+    }
+    // Reflect the current selection in the URL so reloads restore it and links are shareable.
+    function syncUrl() {
+      const q = new URLSearchParams();
+      const t = $('tourn').value, p = $('player').value, r = $('round').value;
+      if (t) q.set('t', t);
+      if (p) q.set('p', p);
+      if (r) q.set('r', r);
+      q.set('v', state.view);
+      history.replaceState(null, '', location.pathname + '?' + q.toString());
+    }
+    async function copyLink(btn) {
+      syncUrl();
+      try {
+        await navigator.clipboard.writeText(location.href);
+        const orig = btn.textContent;
+        btn.textContent = '✓ copied';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      } catch (e) {
+        status('Copy failed — copy the URL from the address bar instead.', true);
+      }
+    }
+
+    async function loadPlayers() {
+      const tid = $('tourn').value;
+      if (!tid) return;
+      status('Loading field…');
+      const sel = $('player'); sel.innerHTML = '<option>loading…</option>';
+      try {
+        const data = await api(`/api/leaderboard?tournamentId=${encodeURIComponent(tid)}`);
+        sel.innerHTML = '';
+        data.players.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p.id;
+          o.textContent = `${p.position ? p.position + '  ' : ''}${p.name}${p.total ? '  (' + p.total + ')' : ''}`;
+          sel.appendChild(o);
+        });
+        // remember the tournament's latest round with data (used as the
+        // Shot-trails default; First putts stays on "All rounds").
+        state.currentRound = data.currentRound || null;
+        status(`${data.players.length} players in the field.`);
+      } catch (e) { sel.innerHTML = '<option>—</option>'; status('Field failed: ' + e.message, true); }
+    }
+
+    // ---- shot-trail rendering -------------------------------------------
+    function coord(c) {
+      if (!c) return null;
+      const x = c.tourcastX, y = c.tourcastY;
+      if (x == null || y == null || x <= 0 || y <= 0) return null; // -1 / 0 == no data
+      return { x, y };
+    }
+
+    function plotHole(strokes) {
+      const segs = [];
+      for (const s of strokes) {
+        const lr = s.overview && s.overview.leftToRightCoords;
+        if (!lr) continue;
+        const f = coord(lr.fromCoords), t = coord(lr.toCoords);
+        if (f && t) segs.push({ f, t, type: (s.strokeType || '').toUpperCase() });
+      }
+      if (segs.length === 0) return `<div class="noplot">no shot<br>coordinates</div>`;
+
+      const pts = segs.flatMap(s => [s.f, s.t]);
+      const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+      let minX = Math.min(...xs), maxX = Math.max(...xs);
+      let minY = Math.min(...ys), maxY = Math.max(...ys);
+      const spanX = maxX - minX || 1, spanY = maxY - minY || 1;
+      const span = Math.max(spanX, spanY);           // keep aspect ratio (square)
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+      const V = 150, PAD = 16, S = (V - 2 * PAD) / span;
+      const px = (x) => PAD + (x - cx) * S + (V - 2 * PAD) / 2;
+      const py = (y) => V - (PAD + (y - cy) * S + (V - 2 * PAD) / 2); // flip Y
+
+      let svg = `<svg viewBox="0 0 ${V} ${V}">`;
+      // segments
+      segs.forEach((s) => {
+        const putt = s.type === 'PUTT';
+        const col = s.type === 'PENALTY' ? 'var(--penalty)' : putt ? 'var(--putt)' : 'var(--stroke)';
+        svg += `<line x1="${px(s.f.x)}" y1="${py(s.f.y)}" x2="${px(s.t.x)}" y2="${py(s.t.y)}"
+                 stroke="${col}" stroke-width="${putt ? 1.4 : 2}" stroke-linecap="round"
+                 ${putt ? 'stroke-dasharray="2 2"' : ''} opacity="0.9"/>`;
+      });
+      // landing dots
+      segs.forEach((s, i) => {
+        if (i === segs.length - 1) return;
+        svg += `<circle cx="${px(s.t.x)}" cy="${py(s.t.y)}" r="2.4" fill="#fff" opacity="0.85"/>`;
+      });
+      // tee + cup
+      const tee = segs[0].f, cup = segs[segs.length - 1].t;
+      svg += `<path d="M ${px(tee.x)} ${py(tee.y) - 4} L ${px(tee.x) - 3.5} ${py(tee.y) + 3} L ${px(tee.x) + 3.5} ${py(tee.y) + 3} Z" fill="var(--accent)"/>`;
+      svg += `<circle cx="${px(cup.x)}" cy="${py(cup.y)}" r="4" fill="none" stroke="#fff" stroke-width="1.5"/>`;
+      svg += `<circle cx="${px(cup.x)}" cy="${py(cup.y)}" r="1.4" fill="#fff"/>`;
+      svg += `</svg>`;
+      return svg;
+    }
+
+    function radarChips(r) {
+      if (!r) return '';
+      const bits = [];
+      if (r.ballSpeed) bits.push(`<span class="chip">ball <b>${r.ballSpeed}</b> mph</span>`);
+      if (r.clubSpeed) bits.push(`<span class="chip">club <b>${r.clubSpeed}</b></span>`);
+      if (r.verticalLaunchAngle) bits.push(`<span class="chip">launch <b>${r.verticalLaunchAngle}°</b></span>`);
+      if (r.launchSpin) bits.push(`<span class="chip">spin <b>${Math.round(r.launchSpin)}</b></span>`);
+      if (r.apexHeight) bits.push(`<span class="chip">apex <b>${r.apexHeight}</b> ft</span>`);
+      return bits.length ? `<div class="chips">${bits.join('')}</div>` : '';
+    }
+
+    function renderStroke(s) {
+      const type = (s.strokeType || '').toUpperCase();
+      const cls = type === 'PUTT' ? 'putt' : type === 'PENALTY' ? 'penalty' : '';
+      return `<div class="strk ${cls}">
+        <div class="pbp"><b>${s.strokeNumber}.</b> ${s.playByPlay || ''}</div>
+        <div class="loc">${s.fromLocation || ''} → ${s.toLocation || ''}</div>
+        ${radarChips(s.radarData)}
+      </div>`;
+    }
+
+    function renderHole(h) {
+      return `<div class="hole">
+        <div class="hole-hd">
+          <span class="num">${h.holeNumber}</span>
+          <span class="meta">Par ${h.par} · ${h.yardage} yds</span>
+          <span class="score">${h.score ?? ''}</span>
+        </div>
+        <div class="hole-body">
+          <div class="plot">${plotHole(h.strokes || [])}</div>
+          <div class="strokes">${(h.strokes || []).map(renderStroke).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], view: 'putts' };
+    const playerLabel = () => $('player').selectedOptions[0]?.textContent.trim() || $('player').value;
+
+    function renderTrails() {
+      const d = state.shots;
+      if (!d) { $('out').innerHTML = ''; return; }
+      const holes = d.holes || [];
+      $('out').innerHTML =
+        `<div class="summary"><b>${playerLabel()}</b> — round ${d.round} · <b>${holes.length}</b> holes</div>
+         ${asOfBar(state.shotsTs)}
+         <div class="holes">${holes.map(renderHole).join('')}</div>`;
+    }
+
+    // ---- first-putts view -----------------------------------------------
+    function resultColor(diff) {
+      if (diff == null) return 'var(--muted)';
+      if (diff < 0) return 'var(--accent)';   // birdie or better
+      if (diff === 0) return '#cbd5e1';        // par
+      if (diff === 1) return 'var(--stroke)';  // bogey
+      return 'var(--penalty)';                 // double+
+    }
+
+    function renderPutts() {
+      const d = state.putts;
+      if (!d) { $('out').innerHTML = ''; return; }
+      const rows = d.holes.slice().sort((a, b) => a.hole - b.hole);
+      const trows = rows.map(r => {
+        const cls = r.putts === 1 ? 'made' : r.putts >= 3 ? 'threeputt' : '';
+        const had = r.approachHad
+          ? `<span title="hit it ${r.approachDist || '?'} from ${r.approachFrom || '?'}">${r.approachHad}</span>`
+          : '<span style="color:var(--muted)">—</span>';
+        const prox = r.firstPuttFt != null ? r.firstPuttFt + ' ft'
+          : '<span style="color:var(--muted)">off green</span>';
+        const made = r.holedOffGreen
+          ? '<span style="color:var(--muted)" title="holed from off the green — no putt">—</span>'
+          : r.putts === 1
+            ? '<span style="color:var(--accent);font-weight:700" title="first putt holed">✓</span>'
+            : `<span style="color:var(--penalty)" title="${r.putts}-putt">✗</span>`;
+        const col = resultColor(r.scoreToPar);
+        return `<tr class="${cls}">
+          <td class="num">${r.hole}</td>
+          <td class="num">${had}</td>
+          <td class="num dist">${prox}</td>
+          <td class="num">${made}</td>
+          <td><span class="pill" style="background:${col};color:#05130a">${r.result}</span></td>
+        </tr>`;
+      }).join('');
+      $('out').innerHTML =
+        `<div class="summary"><b>${playerLabel()}</b> — round ${d.round}</div>
+         ${asOfBar(state.puttsTs)}
+         <div class="caphint"><b>Had</b> = distance to the pin before the shot · <b>Proximity</b> = how close it finished · <b>Made</b> = first putt holed (<b class="made">green</b> row) · <b class="tp">red</b> = 3-putt+</div>
+         <table class="putts">
+           <thead><tr><th>Hole</th><th>Had</th><th>Proximity</th><th>Made</th><th>Result</th></tr></thead>
+           <tbody>${trows}</tbody>
+         </table>`;
+    }
+
+    // Compact approach distance for the matrix: "93 yds"->"93y", "46 ft 2 in."->"46'".
+    function approachShort(s) {
+      if (!s) return '';
+      let m = s.match(/(\d+)\s*yds/);
+      if (m) return m[1] + 'y';
+      m = s.match(/(\d+)\s*ft/);
+      if (m) return m[1] + "'";
+      m = s.match(/(\d+)\s*in/);
+      if (m) return m[1] + '"';
+      return s;
+    }
+
+    // ---- all-rounds condensed matrix ------------------------------------
+    function renderPuttsAll() {
+      const byRound = state.puttsAll || {};
+      const scored = h => h && h.score != null && h.score !== '' && h.score !== '-';
+      const roundPlayed = r => byRound[r] && (byRound[r].holes || []).some(scored);
+      const played = [1, 2, 3, 4].filter(roundPlayed);
+      if (!played.length) { $('out').innerHTML = '<div class="summary">No rounds available for this player.</div>'; return; }
+      const map = {}; played.forEach(r => { map[r] = {}; byRound[r].holes.forEach(h => map[r][h.hole] = h); });
+      const holes = [...new Set(played.flatMap(r => byRound[r].holes.filter(scored).map(h => h.hole)))].sort((a, b) => a - b);
+      const frontHoles = holes.filter(h => h <= 9);
+      const backHoles = holes.filter(h => h > 9);
+
+      const cell = (row) => {
+        if (!scored(row)) return '<td class="mx"></td>';           // not played yet
+        if (row.firstPuttFt == null) return '<td class="mx"><span class="og" title="holed off green">–</span></td>';
+        const cls = row.putts === 1 ? 'made' : row.putts >= 3 ? 'threeputt' : '';
+        const hadTip = row.approachHad ? `had ${row.approachHad} → ` : '';
+        const tip = `Hole ${row.hole} · ${hadTip}${row.firstPuttFt} ft${row.putts === 1 ? ' · made' : ` · ${row.putts}-putt`} · ${row.result}`;
+        return `<td class="mx ${cls}" title="${tip}">
+          <span class="mput" style="color:${resultColor(row.scoreToPar)}">${row.firstPuttFt}</span>
+          <span class="mappr">${approachShort(row.approachHad)}</span>
+        </td>`;
+      };
+      // one nine's worth of cells for a given hole (empty if that hole is absent)
+      const nineCells = (hole) => hole == null
+        ? `<td class="num"></td>${played.map(() => '<td class="mx"></td>').join('')}`
+        : `<td class="num">${hole}</td>${played.map(r => cell(map[r][hole])).join('')}`;
+
+      const span = 1 + played.length;
+      const roundHdr = `<th class="num">Hole</th>${played.map(r => `<th class="num">R${r}</th>`).join('')}`;
+      const head = `
+        <tr><th class="mxhdr" colspan="${span}">Front</th><th class="mxgap"></th><th class="mxhdr" colspan="${span}">Back</th></tr>
+        <tr>${roundHdr}<th class="mxgap"></th>${roundHdr}</tr>`;
+      const nRows = Math.max(frontHoles.length, backHoles.length);
+      let body = '';
+      for (let i = 0; i < nRows; i++) {
+        body += `<tr>${nineCells(frontHoles[i])}<td class="mxgap"></td>${nineCells(backHoles[i])}</tr>`;
+      }
+
+      const tsList = played.map(r => state.puttsAllTs && state.puttsAllTs[r]).filter(Boolean);
+      const asOf = tsList.length ? Math.min(...tsList) : null;
+      const key = `<div class="mxkey">
+        <div class="kgrp"><span class="kt">Fill</span>
+          <span class="ksw made">1</span> 1-putt
+          <span class="ksw threeputt">3+</span> 3-putt or worse</div>
+        <div class="kgrp"><span class="kt">Per cell</span>
+          <span class="knum">12.2</span> proximity ft <span class="mappr" style="display:inline">/ 117y</span> had</div>
+        <div class="kgrp"><span class="kt">Number = score</span>
+          <span class="knum" style="color:var(--accent)">Birdie+</span>
+          <span class="knum" style="color:#cbd5e1">Par</span>
+          <span class="knum" style="color:var(--stroke)">Bogey</span>
+          <span class="knum" style="color:var(--penalty)">Dbl+</span></div>
+        <div class="kgrp"><span class="og">–</span> holed off green</div>
+      </div>`;
+      $('out').innerHTML =
+        `<div class="summary"><b>${playerLabel()}</b> — all rounds · first-putt length (ft)</div>
+         ${asOfBar(asOf)}
+         ${key}
+         <table class="putts"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    }
+
+    function renderView() {
+      $('legend').style.display = state.view === 'trails' ? '' : 'none';
+      if (state.puttsAll) {
+        if (state.view === 'trails') $('out').innerHTML = '<div class="summary">Select a single round to see shot trails.</div>';
+        else renderPuttsAll();
+        return;
+      }
+      (state.view === 'trails' ? renderTrails : renderPutts)();
+    }
+
+    // --- session cache: completed rounds only; live round always re-fetched ---
+    const dataCache = new Map();  // "kind:tid:pid:round" -> { data, ts }
+    const scoredHole = h => h && h.score != null && h.score !== '' && h.score !== '-';
+
+    function roundCompleted(tid, round) {
+      const t = state.tournaments.find(x => x.id === tid);
+      if (!t) return false;
+      if (t.tournamentStatus === 'COMPLETED') return true;
+      // in-progress event: rounds before the current one are final
+      if (t.tournamentStatus === 'IN_PROGRESS') return state.currentRound != null && Number(round) < Number(state.currentRound);
+      return false;
+    }
+    async function fetchRound(kind, tid, pid, round, force) {
+      const cacheable = roundCompleted(tid, round);
+      const key = `${kind}:${tid}:${pid}:${round}`;
+      if (!force && cacheable && dataCache.has(key)) return { ...dataCache.get(key), source: 'client' };
+      const refreshQ = force ? '&refresh=true' : '';  // also bust the server (Redis) entry
+      const url = kind === 'shots'
+        ? `/api/shots?tournamentId=${tid}&playerId=${pid}&round=${round}&radar=true${refreshQ}`
+        : `/api/putts?tournamentId=${tid}&playerId=${pid}&round=${round}${refreshQ}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+      const entry = { data: await r.json(), ts: Date.now() };
+      const source = r.headers.get('X-Cache') === 'HIT' ? 'redis' : 'live';
+      if (cacheable) dataCache.set(key, entry); else dataCache.delete(key);
+      return { ...entry, source };
+    }
+    function fmtWhen(ts) {
+      return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+    function asOfBar(ts) {
+      if (!ts) return '';
+      let load = '';
+      if (state.loadMs != null) {
+        const src = state.loadCached ? 'cached' : 'live';
+        const tip = state.loadCached ? 'served from cache (Redis / in-memory)' : 'fetched live from the PGA API';
+        load = ` · <span class="loadms" title="${tip}">loaded in ${state.loadMs} ms · ${src}</span>`;
+      }
+      return `<div class="asof">data current as of <b>${fmtWhen(ts)}</b>${load}
+        <button class="refresh-btn" type="button">↻ refresh</button>
+        <button class="refresh-btn copylink-btn" type="button">🔗 copy link</button></div>`;
+    }
+
+    async function loadShots(opts = {}) {
+      const force = !!opts.force;
+      const tid = $('tourn').value, pid = $('player').value, rnd = $('round').value;
+      if (!tid || !pid) { status('Pick a tournament and player first.', true); return; }
+      $('go').disabled = true; status(force ? 'Refreshing…' : 'Loading…'); $('out').innerHTML = '';
+      const t0 = performance.now();
+      const setLoadMeta = (sources) => {
+        state.loadMs = Math.round(performance.now() - t0);
+        state.loadCached = sources.length > 0 && sources.every(s => s !== 'live');
+      };
+      try {
+        if (rnd === 'all') {
+          // only fetch rounds that have started (<= the tournament's current round)
+          const maxRound = Number(state.currentRound) || 4;
+          const rounds = [1, 2, 3, 4].filter(r => r <= maxRound);
+          const entries = await Promise.all(rounds.map(r =>
+            fetchRound('putts', tid, pid, r, force).catch(() => null)));
+          state.puttsAll = {}; state.puttsAllTs = {};
+          rounds.forEach((r, i) => {
+            state.puttsAll[r] = entries[i] ? entries[i].data : null;
+            state.puttsAllTs[r] = entries[i] ? entries[i].ts : null;
+          });
+          state.shots = state.putts = null;
+          setLoadMeta(entries.filter(Boolean).map(e => e.source));
+          renderView();
+          const n = rounds.filter(r => state.puttsAll[r] && (state.puttsAll[r].holes || []).some(scoredHole)).length;
+          status(`Loaded ${n} round${n === 1 ? '' : 's'} in ${state.loadMs} ms.`);
+        } else {
+          let useRound = rnd;
+          let [sE, pE] = await Promise.all([
+            fetchRound('shots', tid, pid, useRound, force),
+            fetchRound('putts', tid, pid, useRound, force),
+          ]);
+          if (!(pE.data.holes || []).some(scoredHole)) {
+            // no data for this player in the chosen round — drop to their last round with data
+            const all = await Promise.all([1, 2, 3, 4].map(r =>
+              fetchRound('putts', tid, pid, r, force).catch(() => null)));
+            const latest = [4, 3, 2, 1].find(r => all[r - 1] && (all[r - 1].data.holes || []).some(scoredHole));
+            if (latest && String(latest) !== String(useRound)) {
+              useRound = String(latest);
+              $('round').value = useRound;
+              [sE, pE] = await Promise.all([
+                fetchRound('shots', tid, pid, useRound, force),
+                fetchRound('putts', tid, pid, useRound, force),
+              ]);
+            }
+          }
+          state.shots = sE.data; state.putts = pE.data;
+          state.shotsTs = sE.ts; state.puttsTs = pE.ts;
+          state.puttsAll = null; state.puttsAllTs = null;
+          setLoadMeta([sE.source, pE.source]);
+          renderView();
+          status(`Loaded round ${useRound} · ${(sE.data.holes || []).length} holes in ${state.loadMs} ms.`);
+        }
+        syncUrl();
+      } catch (e) {
+        state.shots = state.putts = state.puttsAll = null;
+        status('Load failed: ' + e.message + '  (player may not have played this round)', true);
+      } finally { $('go').disabled = false; }
+    }
+
+    function setActiveView(view) {
+      document.querySelectorAll('.segbtn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+      state.view = view;
+    }
+    document.querySelectorAll('.segbtn').forEach(btn => btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      setActiveView(view);
+      // Shot trails is per-round. If "All rounds" is selected, switch the picker
+      // to the latest played round and load it so trails render immediately.
+      if (view === 'trails' && $('round').value === 'all') {
+        const scored = h => h && h.score != null && h.score !== '' && h.score !== '-';
+        const latest = state.puttsAll
+          ? [4, 3, 2, 1].find(r => state.puttsAll[r] && (state.puttsAll[r].holes || []).some(scored))
+          : null;
+        $('round').value = String(latest || state.currentRound || 1);
+        loadShots();  // syncs URL on completion
+        return;
+      }
+      renderView();
+      syncUrl();
+    }));
+    $('year').addEventListener('change', () => loadTournaments());
+    $('go').addEventListener('click', () => loadShots());
+    $('out').addEventListener('click', (e) => {
+      const copyBtn = e.target.closest('.copylink-btn');
+      if (copyBtn) { copyLink(copyBtn); return; }
+      if (e.target.closest('.refresh-btn')) loadShots({ force: true });
+    });
+
+    // Restore selection from the URL (shared link / reload), then auto-load.
+    async function init() {
+      setupTournCombo();
+      const q = new URLSearchParams(location.search);
+      const wantT = q.get('t'), wantP = q.get('p'), wantR = q.get('r'), wantV = q.get('v');
+      if (wantV === 'trails') setActiveView('trails');
+      if (wantT && /^R\d{7}$/.test(wantT)) $('year').value = wantT.slice(1, 5);
+      await loadTournaments(wantT);
+      if (wantP) selectPlayer(wantP);
+      if (wantR && [...$('round').options].some(o => o.value === wantR)) $('round').value = wantR;
+      loadShots();
+    }
+    init();
+  </script>
+</body>
+</html>

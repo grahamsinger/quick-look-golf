@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>golf_api — GraphiQL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/graphiql@3/graphiql.min.css" />
+  <style>html, body, #graphiql { height: 100%; margin: 0; }</style>
+</head>
+<body>
+  <div id="graphiql">Loading GraphiQL…</div>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/graphiql@3/graphiql.min.js"></script>
+  <script>
+    const DEFAULT_QUERY = `# The full pgatour.com GraphQL API — introspection is on, so autocomplete
+# (Ctrl-Space) knows every field. This query returns Scheffler's shots.
+query ShotDetails {
+  shotDetailsV3(tournamentId: "R2026525", playerId: "46046", round: 1, includeRadar: true) {
+    holes {
+      holeNumber par score
+      strokes {
+        strokeNumber playByPlay fromLocation toLocation
+        radarData { ballSpeed verticalLaunchAngle launchSpin apexHeight }
+      }
+    }
+  }
+}`;
+    const fetcher = GraphiQL.createFetcher({ url: '/api/graphql' });
+    ReactDOM.createRoot(document.getElementById('graphiql')).render(
+      React.createElement(GraphiQL, { fetcher, defaultQuery: DEFAULT_QUERY })
+    );
+  </script>
+</body>
+</html>

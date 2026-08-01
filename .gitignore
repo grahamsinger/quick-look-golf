@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.uv/
+.DS_Store
+
+# runtime artifacts from start.sh
+server.log
+.server.pid
