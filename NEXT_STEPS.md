@@ -8,9 +8,9 @@ Aug 2026: the fallback now calls `syncRoundBtn()` after writing
 `$('round').value`, verified against the live-event repro.)
 
 ## To do
-- **Push to GitHub** — planned (do `gh repo create`, decide public/private).
+- (pushed to GitHub Aug 2026: https://github.com/grahamsinger/quick-look-golf .
   Note `pga/client.py` contains pgatour.com's *public* front-end API keys
-  (scraped from their JS), not personal secrets — safe to publish.
+  (scraped from their JS), not personal secrets — safe to publish.)
 
 ## Design refresh — v1 shipped (Fairway theme, Jul 2026)
 Implemented the **"Fairway"** light editorial identity (replaces the generic

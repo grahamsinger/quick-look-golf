@@ -1,4 +1,4 @@
-# golf_api
+# quick-look-golf
 
 Client and schema tooling for the **unofficial PGA TOUR GraphQL API** — the
 backend behind pgatour.com and its TOURCAST shot-tracker, and a free source of
