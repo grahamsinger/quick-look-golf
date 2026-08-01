@@ -138,7 +138,16 @@
     .select-wrap select { appearance: none; -webkit-appearance: none; padding-right: 32px; width: 100%; }
     .select-wrap .chev { position: absolute; right: 11px; color: var(--ink-3); pointer-events: none; }
     .field-player .select-wrap { min-width: 210px; } .field-player select { max-width: 340px; }
-    .field-round .select-wrap { min-width: 132px; }
+    /* round picker: custom styled dropdown (matches the tournament combobox) */
+    .round-combo { position: relative; min-width: 138px; }
+    .round-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+      background: var(--card-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r);
+      padding: 9px 12px; height: 40px; font-size: 13.5px; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
+    .round-btn:hover { background: var(--card); }
+    .round-btn[aria-expanded="true"] { border-color: var(--pine); box-shadow: 0 0 0 3px var(--focus-ring); background: var(--card); }
+    .round-btn .chev { color: var(--ink-3); flex: none; }
+    .round-menu { min-width: 100%; }
+    .round-menu li.sel:not(.active) { color: var(--pine); font-weight: 640; }
     .round-nav { display: flex; align-items: center; gap: 6px; }
     .rnav { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 40px;
       background: var(--card-2); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; padding: 0; }
@@ -367,13 +376,17 @@
         <button class="rnav" data-step="-1" type="button" aria-label="Previous round" title="Previous round">
           <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8 10 12.5"/></svg>
         </button>
-        <div class="select-wrap">
-          <select id="round">
+        <div class="round-combo">
+          <select id="round" hidden>
             <option value="1">Round 1</option><option value="2">Round 2</option>
             <option value="3">Round 3</option><option value="4">Round 4</option>
             <option value="all" selected>All rounds</option>
           </select>
-          <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+          <button type="button" id="roundBtn" class="round-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="roundMenu">
+            <span id="roundBtnLabel">All rounds</span>
+            <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+          </button>
+          <ul id="roundMenu" class="combo-list round-menu" role="listbox" hidden></ul>
         </div>
         <button class="rnav" data-step="1" type="button" aria-label="Next round" title="Next round">
           <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
@@ -571,7 +584,7 @@
         // remember the tournament's latest round with data (used as the
         // Shot-trails default; First putts stays on "All rounds").
         state.currentRound = data.currentRound || null;
-        updateRoundNav();
+        updateRoundOptions();
         status(`${data.players.length} players in the field.`);
       } catch (e) { sel.innerHTML = '<option>—</option>'; status('Field failed: ' + e.message, true); }
     }
@@ -961,8 +974,48 @@
       const target = v === 'all' ? (step > 0 ? 1 : mx) : Math.min(mx, Math.max(1, Number(v) + step));
       if (String(target) === v) return;
       $('round').value = String(target);
+      syncRoundBtn();
       updateRoundNav();
       loadShots();
+    }
+    // Round options reflect data availability: only rounds 1..maxRound (played so
+    // far), plus "All rounds" — except in the Shots view, which is per-round only.
+    function updateRoundOptions() {
+      const sel = $('round');
+      const cur = sel.value;
+      const mx = maxRound();
+      const allowAll = state.view !== 'shots';
+      let html = '';
+      for (let r = 1; r <= mx; r++) html += `<option value="${r}">Round ${r}</option>`;
+      if (allowAll) html += '<option value="all">All rounds</option>';
+      sel.innerHTML = html;
+      sel.value = [...sel.options].some(o => o.value === cur) ? cur : (allowAll ? 'all' : String(mx));
+      syncRoundBtn();
+      updateRoundNav();
+    }
+    // --- custom round dropdown (styled menu over a hidden <select>) ---------
+    const roundLabel = (v) => { const o = [...$('round').options].find(x => x.value === v); return o ? o.textContent : v; };
+    function syncRoundBtn() { $('roundBtnLabel').textContent = roundLabel($('round').value); }
+    function renderRoundMenu() {
+      const sel = $('round').value;
+      $('roundMenu').innerHTML = [...$('round').options].map(o =>
+        `<li role="option" data-val="${o.value}" class="${o.value === sel ? 'sel' : ''}" aria-selected="${o.value === sel}">${o.textContent}</li>`).join('');
+    }
+    function closeRoundMenu() { $('roundMenu').hidden = true; $('roundBtn').setAttribute('aria-expanded', 'false'); }
+    function openRoundMenu() { renderRoundMenu(); $('roundMenu').hidden = false; $('roundBtn').setAttribute('aria-expanded', 'true'); }
+    function selectRound(v) {
+      closeRoundMenu();
+      if (v === $('round').value) return;
+      $('round').value = v;
+      syncRoundBtn();
+      updateRoundNav();
+      loadShots();
+    }
+    function setupRoundCombo() {
+      $('roundBtn').addEventListener('click', () => { $('roundMenu').hidden ? openRoundMenu() : closeRoundMenu(); });
+      $('roundMenu').addEventListener('click', (e) => { const li = e.target.closest('li[role=option]'); if (li) selectRound(li.dataset.val); });
+      $('roundBtn').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRoundMenu(); });
+      document.addEventListener('click', (e) => { if (!e.target.closest('.round-combo')) closeRoundMenu(); });
     }
 
     function setActiveView(view) {
@@ -971,15 +1024,18 @@
     }
     document.querySelectorAll('.segbtn').forEach(btn => btn.addEventListener('click', () => {
       const view = btn.dataset.view;
+      const wasAll = $('round').value === 'all';
       setActiveView(view);
-      // Shots is per-round. If "All rounds" is selected, switch the picker
-      // to the latest played round and load it so shot detail renders immediately.
-      if (view === 'shots' && $('round').value === 'all') {
+      updateRoundOptions();  // Shots view drops the "All rounds" option
+      // Shots is per-round. If "All rounds" was selected, switch the picker to the
+      // latest played round and load it so shot detail renders immediately.
+      if (view === 'shots' && wasAll) {
         const scored = h => h && h.score != null && h.score !== '' && h.score !== '-';
         const latest = state.puttsAll
           ? [4, 3, 2, 1].find(r => state.puttsAll[r] && (state.puttsAll[r].holes || []).some(scored))
           : null;
-        $('round').value = String(latest || state.currentRound || 1);
+        $('round').value = String(latest || maxRound());
+        syncRoundBtn();
         loadShots();  // syncs URL on completion
         return;
       }
@@ -1000,6 +1056,7 @@
     async function init() {
       initTheme();
       setupTournCombo();
+      setupRoundCombo();
       const q = new URLSearchParams(location.search);
       const wantT = q.get('t'), wantP = q.get('p'), wantR = q.get('r'), wantV = q.get('v');
       if (wantV === 'shots' || wantV === 'trails') setActiveView('shots');
@@ -1007,6 +1064,7 @@
       await loadTournaments(wantT);
       if (wantP) selectPlayer(wantP);
       if (wantR && [...$('round').options].some(o => o.value === wantR)) $('round').value = wantR;
+      syncRoundBtn();
       loadShots();
     }
     init();

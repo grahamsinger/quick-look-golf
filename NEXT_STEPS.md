@@ -44,6 +44,10 @@ dark-slate + green look):
   number, so a column reads straight down for comparison (e.g. every tee-shot
   ball speed). Each cell = ball speed (full swings) or distance (putts/chips)
   over the color-coded result location; par-3 tee shots flagged.
+- **Round picker → styled dropdown** — a custom menu (matches the tournament
+  combobox) over a hidden `<select>`; shows only rounds with data (1..current) and
+  omits "All rounds" in the Shots view (per-round only). Selecting a round or using
+  the ‹ › arrows loads immediately.
 - **Freshness bar consolidated** into the top-right of the view-toggle row
   (replacing the redundant "Loaded round…" status); with the earlier compression,
   the daily scorecard now fits all 18 holes without scrolling.
@@ -54,13 +58,12 @@ dark-slate + green look):
   `madePuttFeet`; the client aggregates.
 
 Still open (design):
-- **Player & round dropdowns → custom comboboxes** — both are still native
-  `<select>`s that render the raw OS list, which looks jarring next to the styled
-  tournament combobox. Give them the same treatment (share the combobox
-  component/CSS): the **player** picker searchable/typeahead over the 144+ field
-  (keep the position + score, open sticky to the current pick, LIVE-style
-  affordances as fitting); the **round** picker a small styled menu matching the
-  combo (no search needed for 5 items). This is a clear, high-impact polish win.
+- **Player picker → searchable combobox** — the player picker is still a native
+  `<select>` (raw OS list, jarring next to the styled tournament/round pickers).
+  Give it the same treatment: searchable/typeahead over the 144+ field (keep the
+  position + score, open sticky to the current pick). *Parked pending the user's
+  "compelling design" idea for quickly selecting players.* (The round picker
+  already got the custom styled-menu treatment — see shipped.)
 - Responsive / mobile layout.
 
 ## Possible improvements
