@@ -100,6 +100,10 @@ The round drawn over the tournament's real aerial — the feature the removed
   on greens): shot `tourcastX/Y` are **feet**; `world_m = 0.3048 × tourcast −
   offsetConfig` (from `orchestrator-config.pgatour.com/tourcast/pga-tour/{tid}`),
   then the `course.tfw` world-file affine maps meters → the 2048² aerial.
+  The config's `rotate` is **not** applied to shots — it orients the whole 3D
+  scene (terrain + shots together), so it cancels relative to the aerial;
+  verified by Kabsch fit at TPC Twin Cities (rotate −0.157 rad in config,
+  fitted rotation ≈ 0, translation = −offset within 30 cm).
 - New `/api/coursemap` bundles tfw + offset + `courseData.json` pin/tee
   positions (Redis-cached, static per tournament); the aerial hotlinks in an
   `<img>` with an SVG overlay on top.

@@ -15,12 +15,13 @@ function worldToPx(cm, wx, wy) {
   const fy = (t.f - wy) / Math.abs(t.e);
   return [fx * 2048 / t.fullW, fy * 2048 / t.fullH];
 }
-// tourcast feet -> world meters (engine order: scale, rotate, translate)
+// tourcast feet -> world meters. The config's `rotate` is deliberately NOT
+// applied: the engine rotates the whole scene (terrain + shots together) by
+// it, so relative to the aerial it cancels. Verified empirically — a Kabsch
+// fit of shot pins vs courseData pins at TPC Twin Cities (config rotate
+// -0.157 rad) gives rotation ≈ 0 and translation = -offset to within 30 cm.
 function shotToPx(cm, tx, ty) {
-  let wx = 0.3048 * tx, wy = 0.3048 * ty;
-  const r = cm.offset.rotate || 0;
-  if (r) { const c = Math.cos(r), s = Math.sin(r); [wx, wy] = [wx * c - wy * s, wx * s + wy * c]; }
-  return worldToPx(cm, wx - cm.offset.x, wy - cm.offset.y);
+  return worldToPx(cm, 0.3048 * tx - cm.offset.x, 0.3048 * ty - cm.offset.y);
 }
 
 export function renderCourse() {
