@@ -45,13 +45,16 @@ Still open (design):
 - **Shots view density** — make it more table-like; the per-hole cards show too
   little at once. Needs a defined column set (hole, shot #, from → to, distance,
   to-pin, ball/club speed, launch, spin, apex). Design TBD with the user.
-- **Player picker** — still a native `<select>`; give it the tournament-combobox
-  treatment (also listed under Possible improvements).
+- **Player & round dropdowns → custom comboboxes** — both are still native
+  `<select>`s that render the raw OS list, which looks jarring next to the styled
+  tournament combobox. Give them the same treatment (share the combobox
+  component/CSS): the **player** picker searchable/typeahead over the 144+ field
+  (keep the position + score, open sticky to the current pick, LIVE-style
+  affordances as fitting); the **round** picker a small styled menu matching the
+  combo (no search needed for 5 items). This is a clear, high-impact polish win.
 - Responsive / mobile layout.
 
 ## Possible improvements
-- **Player typeahead** — the player dropdown is a plain `<select>` (144+ names);
-  give it the same searchable combobox treatment as the tournament picker.
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*
   shows the chip distance (in feet), because "the shot that set up the putt" is
   the chip. Optional: separately surface the *approach into the green* distance.
