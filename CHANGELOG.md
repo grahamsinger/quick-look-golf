@@ -111,3 +111,24 @@ The round drawn over the tournament's real aerial — the feature the removed
   score-colored hole chips, hover-a-hole isolation. Per-round (like Shots).
   Events without TOURCAST assets (small opposite-field ones) fall back to a
   friendly message.
+
+## Aug 2026 — Course hole zoom
+
+Click a hole on the course overview to zoom into that hole's own aerial:
+
+- Per-hole assets: `terrain{NN}.jpg` (4096², squashed) + `terrain{NN}.tfw`.
+  Unlike `course.tfw`, the per-hole world files carry **rotation terms** (each
+  hole's image is oriented tee-at-the-bottom, green-at-the-top), so the
+  projection uses the full 6-term affine inverse. The squashed jpg un-squashes
+  by rendering the wrap at the tfw's true full-raster aspect ratio with the
+  SVG viewBox in the same space. New `/api/holemap` proxies the world file
+  (Redis-cached, static per tournament).
+- The hole view's round picker offers **"All rounds"** — the player's trails
+  from every round overlaid, color-coded (R1 paper · R2 amber · R3 sky ·
+  R4 rose; adjacent-pair CVD separation validated) with a legend carrying each
+  round's score on the hole. Hovering a trail isolates that round. Identity is
+  never color-alone: legend, tooltips (`R2 #3 · …`), and hover all name the
+  round.
+- ‹ › steps through holes, "‹ Full course" zooms back out (snapping "All
+  rounds" back to the latest played round, which the overview requires), and
+  `?h=` in the URL deep-links straight into a hole.

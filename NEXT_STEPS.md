@@ -17,17 +17,12 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   feel too generous or stingy over time.
 
 ## Possible improvements
-- **Course view v2 ideas** (v1 shipped — see CHANGELOG; projection recipe
-  documented there and in `static/js/views/course.js` / `/api/coursemap`):
-  - **Per-hole zoom** — click a hole chip to crop to that hole. The assets
-    exist: per-hole `terrain/terrain{NN}.jpg` + `terrain{NN}.tfw` +
-    `terrain/cutouts/{hole}.png` on the same host, and `courseData.json`'s
-    `holeCenterLines` give crop boxes/orientation. The round picker should
-    behave like the rest of the app: **round-by-round OR "All rounds"**
-    (the selected player's trails from every round overlaid — tee-shot
-    dispersion at a glance).
+- **Course view ideas** (overview + per-hole zoom shipped — see CHANGELOG;
+  projection recipes documented there and in `static/js/views/course.js` /
+  `/api/coursemap` / `/api/holemap`):
   - **Full-field per-hole overlay** — round-by-round, every player on one
-    hole. **The data problem is already solved**: the schema's
+    hole, rendered into the existing hole zoom. **The data problem is
+    already solved**: the schema's
     `scatterData(tournamentId, course, hole)` returns, in ONE query, every
     player's shot locations for ALL rounds of that hole — grouped by stroke
     number, with player name, hole result (BIRDIE/PAR/…), tourcast coords

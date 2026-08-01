@@ -457,6 +457,45 @@ def coursemap(response: Response, tournamentId: str, refresh: bool = False) -> d
     return out
 
 
+@app.get("/api/holemap")
+def holemap(response: Response, tournamentId: str, hole: int, refresh: bool = False) -> dict:
+    """Per-hole aerial + world-file for the Course view's hole zoom.
+
+    Unlike course.tfw, the per-hole world files carry rotation terms (each
+    hole's image is oriented so the hole runs down the frame), so the client
+    needs the full 6-term affine, not just scale + origin.
+    """
+    key = f"golf:{CACHE_VERSION}:holemap:{tournamentId}:{hole}"
+    if refresh:
+        _cache_del(key)
+    else:
+        cached = _cache_get(key)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            return json.loads(cached)
+    base = f"{_TOURCAST_MODELS}/{tournamentId}/3D_Assets"
+    try:
+        tfw_r = _assets_http.get(f"{base}/terrain/terrain{hole:02d}.tfw")
+        if tfw_r.status_code != 200:
+            return {"available": False}
+        tfw = [float(x) for x in tfw_r.text.split()]
+    except (httpx.HTTPError, ValueError):
+        return {"available": False}
+    if len(tfw) < 8:
+        return {"available": False}
+    out = {
+        "available": True,
+        "imageUrl": f"{base}/terrain/terrain{hole:02d}.jpg",
+        # world-file lines: A, D, B, E, C, F (+ full-res raster W, H; the jpg
+        # itself is 4096x4096, squashed — the client un-squashes via viewBox)
+        "tfw": {"a": tfw[0], "d": tfw[1], "b": tfw[2], "e": tfw[3],
+                "c": tfw[4], "f": tfw[5], "fullW": tfw[6], "fullH": tfw[7]},
+    }
+    _cache_set(key, json.dumps(out))
+    response.headers["X-Cache"] = "MISS"
+    return out
+
+
 @app.get("/graphiql", response_class=HTMLResponse)
 def graphiql() -> str:
     return (STATIC_DIR / "graphiql.html").read_text()

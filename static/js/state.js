@@ -1,7 +1,7 @@
 // Shared app state + derived selectors.
 import { $ } from './dom.js';
 
-export const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], players: [], view: 'putts' };
+export const state = { shots: null, putts: null, puttsAll: null, puttsTs: null, shotsTs: null, puttsAllTs: null, loadMs: null, loadCached: false, currentRound: null, tournaments: [], players: [], view: 'putts', courseHole: null };
 
 export const playerLabel = () => $('player').selectedOptions[0]?.textContent.trim() || $('player').value;
 // strip a leading "pos  " prefix off the option label for the editorial heading

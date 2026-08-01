@@ -38,6 +38,7 @@ export function syncUrl() {
   if (p) q.set('p', p);
   if (r) q.set('r', r);
   q.set('v', state.view);
+  if (state.view === 'course' && state.courseHole) q.set('h', state.courseHole);
   history.replaceState(null, '', location.pathname + '?' + q.toString());
 }
 

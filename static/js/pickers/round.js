@@ -28,12 +28,14 @@ export function stepRound(step) {
 }
 
 // Round options reflect data availability: only rounds 1..maxRound (played so
-// far), plus "All rounds" — except in the Shots view, which is per-round only.
+// far), plus "All rounds" — except in the per-round views: Shots, and the
+// Course overview (the Course *hole zoom* does offer All rounds — trails
+// from every round overlay on one hole).
 export function updateRoundOptions() {
   const sel = $('round');
   const cur = sel.value;
   const mx = maxRound();
-  const allowAll = state.view !== 'shots' && state.view !== 'course';  // both are per-round views
+  const allowAll = state.view !== 'shots' && !(state.view === 'course' && !state.courseHole);
   let html = '';
   for (let r = 1; r <= mx; r++) html += `<option value="${r}">Round ${r}</option>`;
   if (allowAll) html += '<option value="all">All rounds</option>';

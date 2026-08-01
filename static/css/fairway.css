@@ -343,8 +343,38 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 /* hover a hole: isolate it, dim the rest (only when a hole is truly hovered) */
 .cmwrap svg:has(.chole:hover) .chole:not(:hover) { opacity: .38; }
 .chole polyline { pointer-events: stroke; }
+.chole { cursor: pointer; }
 .chole:hover polyline { stroke: #FFD34D; stroke-width: 6; }
 .chole:hover .cpt { r: 8; }
+
+/* ---------- hole zoom (per-hole aerial) ---------- */
+.holebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 2px 2px 10px; }
+.holebar button { background: var(--card-2); color: var(--ink); border: 1px solid var(--line-2);
+  border-radius: var(--r-sm); padding: 5px 11px; font: 600 12.5px var(--sans); cursor: pointer; }
+.holebar button:hover { border-color: var(--pine); background: var(--card); }
+.holenav { display: inline-flex; align-items: center; gap: 6px; }
+.holenav .holetitle { font: 700 14px var(--serif); color: var(--ink); min-width: 62px; text-align: center; }
+.holenav .hstep { padding: 5px 9px; }
+.cmwrap-hole { max-width: 100%; margin: 0 auto; }
+.cmwrap-hole img { width: 100%; height: 100%; object-fit: fill; }
+/* round trail colors (all-rounds overlay): color follows the round, never
+   repainted on hover — validated for adjacent-pair CVD separation */
+.chole.hr { cursor: default; --rc: #F5F1E6; }
+.chole.hr.r2 { --rc: #FFD34D; }
+.chole.hr.r3 { --rc: #5BC0EB; }
+.chole.hr.r4 { --rc: #F2709C; }
+.chole.hr polyline { stroke: var(--rc); }
+.chole.hr .cpt { fill: var(--rc); }
+.chole.hr:hover polyline { stroke: var(--rc); stroke-width: 6; }
+.hpin circle { fill: #FCF9F0; stroke: rgba(20,20,20,.75); stroke-width: 2;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
+/* legend chips: swatch = round color; score keeps the app's result colors */
+.rleg { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
+.rlegchip { display: inline-flex; align-items: center; gap: 6px; }
+.rlegchip .sw { width: 14px; height: 4px; border-radius: 2px; background: #F5F1E6; box-shadow: 0 0 0 1px rgba(20,20,20,.35); }
+.rlegchip .sw.r2 { background: #FFD34D; }
+.rlegchip .sw.r3 { background: #5BC0EB; }
+.rlegchip .sw.r4 { background: #F2709C; }
 
 /* matrix */
 .mxkey { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; color: var(--ink-3); font-size: 12px; margin: 14px 2px 14px; }

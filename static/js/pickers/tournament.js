@@ -55,6 +55,9 @@ function highlightSelectedTourn() {
 export function selectTourn(id, opts = {}) {
   const t = state.tournaments.find(x => x.id === id);
   if (!t) return;
+  // switching to a different course — leave the hole zoom (but not at boot,
+  // when the select is still empty and a deep link may have set the hole)
+  if ($('tourn').value && $('tourn').value !== id) state.courseHole = null;
   $('tourn').value = id;
   $('tournInput').value = tournLabel(t);
   closeTournList();

@@ -58,9 +58,12 @@ default. Self-hosted Fraunces display serif.
 - **Course** view: **every shot of the round drawn over the tournament's real
   aerial** (TOURCAST's georeferenced imagery; shots projected to ~1 m). Trails
   run tee → hole, hover a hole to isolate it, hole chips are score-colored.
-  Available for ShotLink-enhanced events (most of the schedule); smaller
-  opposite-field events don't publish the imagery and fall back gracefully.
-- **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=`), so a
+  **Click a hole to zoom** into its own high-res aerial — per-round, or
+  **"All rounds"** with the player's trails from every round overlaid and
+  color-coded (tee-shot dispersion at a glance). Available for
+  ShotLink-enhanced events (most of the schedule); smaller opposite-field
+  events don't publish the imagery and fall back gracefully.
+- **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=&h=`), so a
   reload restores the view and a **copy-link** button shares it. A freshness bar
   shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp
   is when the data was actually captured from PGA (server-stamped), and

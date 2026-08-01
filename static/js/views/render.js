@@ -9,7 +9,9 @@ import { updateFreshBar } from './freshness.js';
 
 export function renderView() {
   if (state.puttsAll) {
-    if (state.view === 'shots' || state.view === 'course') $('out').innerHTML = '<div class="summary"><span class="meta">Select a single round to see shot-by-shot detail.</span></div>';
+    // the Course hole zoom handles "All rounds" itself (fetches its own shots)
+    if (state.view === 'course' && state.courseHole) renderCourse();
+    else if (state.view === 'shots' || state.view === 'course') $('out').innerHTML = '<div class="summary"><span class="meta">Select a single round to see shot-by-shot detail.</span></div>';
     else renderPuttsAll();
   } else {
     ({ shots: renderShots, course: renderCourse }[state.view] || renderPutts)();
