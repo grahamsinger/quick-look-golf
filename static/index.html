@@ -738,8 +738,10 @@
       if (m || inch) { const f = (m ? +m[1] : 0) + (inch ? +inch[1] / 12 : 0); return { ft: f, yds: f / 3, kind: 'greenside' }; }
       return null;
     }
-    // static tour-average first-putt proximity (ft) by start distance + lie
-    const APPR_BANDS = [[75, 16.5], [100, 18], [125, 20.5], [150, 23.5], [175, 27], [200, 32], [225, 38], [250, 45], [Infinity, 55]];
+    // static tour-average first-putt proximity (ft) by start distance + lie.
+    // Long bands keep climbing — tour avg from 275+ is ~72 ft (and that's among
+    // shots where pros *chose* to go for it), so a 46-footer from 285 rates ▴.
+    const APPR_BANDS = [[75, 16.5], [100, 18], [125, 20.5], [150, 23.5], [175, 27], [200, 32], [225, 38], [250, 46], [275, 58], [Infinity, 72]];
     function expectedProx(had, fromLoc) {
       if (!had) return null;
       const lie = (fromLoc || '').toLowerCase();
@@ -757,7 +759,7 @@
       const kind = had ? had.kind : null;
       if (exp == null || actualFt == null) return { cls: '', glyph: '', exp: null, kind };
       const r = actualFt / exp;
-      if (r <= 0.6) return { cls: 'q-hot', glyph: '▴', exp, kind };
+      if (r <= 0.65) return { cls: 'q-hot', glyph: '▴', exp, kind };
       if (r >= 1.8) return { cls: 'q-cold', glyph: '▾', exp, kind };
       return { cls: '', glyph: '', exp, kind };
     }
