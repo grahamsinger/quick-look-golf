@@ -329,7 +329,10 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 /* ---------- course overview (aerial + shot trails) ---------- */
 /* colors here are fixed (they sit on the aerial photo, same in both themes) */
 .card.coursemap { padding: 10px; }
-.cmwrap { position: relative; width: min(980px, 100%); }
+/* the overview card hugs the aerial instead of leaving dead space beside it
+   (the hole-zoom card keeps full width — its bar + centered portrait need it) */
+.card.coursemap:not(.holemap) { width: fit-content; max-width: 100%; }
+.cmwrap { position: relative; width: 980px; max-width: 100%; }
 .cmwrap img { width: 100%; display: block; border-radius: 8px; user-select: none; }
 .cmwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .chole polyline { fill: none; stroke: rgba(252,249,240,.95); stroke-width: 4;
