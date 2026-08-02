@@ -33,13 +33,30 @@ function shotCell(strokes, i, par) {
   else if (isPutt) { res = shotDist(s.distanceRemaining) + ' left'; cls = ''; }
   else { const r = shotResult(s.toLocation); res = r.label; cls = r.cls; }
   const p3 = (i === 0 && par === 3) ? '<sup class="p3" title="par-3 tee shot — an iron/hybrid, not a drive">P3</sup>' : '';
+  const drop = s.dropNote ? `<sup class="p3" title="${esc(`played after a drop — ${s.dropNote}`)}">D</sup>` : '';
   const tip = [`#${s.strokeNumber}`, `${s.fromLocation || '?'} → ${isHoled ? 'holed' : (s.toLocation || '?')}`,
-    s.distance ? `${s.distance} shot` : '', bs ? `ball ${s.radarData.ballSpeed} mph` : '', s.playByPlay || '']
+    s.distance ? `${s.distance} shot` : '', bs ? `ball ${s.radarData.ballSpeed} mph` : '',
+    s.dropNote ? `after a drop (${s.dropNote})` : '', s.playByPlay || '']
     .filter(Boolean).join(' · ');
   return `<td class="scell" title="${esc(tip)}">
-    <span class="sc-v">${esc(primary)}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}</span>
+    <span class="sc-v">${esc(primary)}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}${drop}</span>
     <span class="sc-r r-${cls}">${esc(res)}</span>
   </td>`;
+}
+
+// Only actual swings get a shot column. ShotLink interleaves non-stroke
+// entries (strokeType DROP — a free-relief/penalty drop, sharing the prior
+// shot's strokeNumber); folding one into a column made a 3 read as 4 shots.
+// The drop's story is kept as a marker + tooltip on the shot played after it.
+function realStrokes(h) {
+  const out = [];
+  let pendingDrop = null;
+  (h.strokes || []).forEach(s => {
+    if ((s.strokeType || 'STROKE') !== 'STROKE') { pendingDrop = s; return; }
+    if (pendingDrop) { s = { ...s, dropNote: pendingDrop.playByPlay || 'drop' }; pendingDrop = null; }
+    out.push(s);
+  });
+  return out;
 }
 
 export function renderShots() {
@@ -48,10 +65,10 @@ export function renderShots() {
   const holes = d.holes || [];
   if (!holes.length) { $('out').innerHTML = '<div class="summary"><span class="meta">No shot data for this round.</span></div>'; return; }
   const startHole = holes[0].holeNumber;  // play order → first hole is the start
-  const maxShots = Math.max(1, ...holes.map(h => (h.strokes || []).length));
+  const maxShots = Math.max(1, ...holes.map(h => realStrokes(h).length));
   const shotHdrs = Array.from({ length: maxShots }, (_, i) => `<th class="scol">Shot ${i + 1}</th>`).join('');
   const rows = holes.map(h => {
-    const strokes = h.strokes || [];
+    const strokes = realStrokes(h);
     const cells = Array.from({ length: maxShots }, (_, i) =>
       i < strokes.length ? shotCell(strokes, i, h.par) : '<td class="scell"></td>').join('');
     const diff = (h.score != null && h.par != null) ? h.score - h.par : null;

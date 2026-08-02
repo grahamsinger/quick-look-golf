@@ -92,12 +92,16 @@ function holePoints(h, toPt, tipPrefix = '') {
   const pts = [];
   (h.strokes || []).forEach(s => {
     const ov = (s.overview || {}).leftToRightCoords || {};
+    // a DROP row is where the ball was placed, not a swing — keep the point
+    // (the trail really moved) but say so instead of faking a shot number
+    const isDrop = (s.strokeType || 'STROKE') !== 'STROKE';
     const add = (c, isFrom) => {
       if (!c || c.tourcastX == null) return;
       const [x, y] = toPt(c.tourcastX, c.tourcastY);
       if (isFrom && pts.length) return;
       const holed = !((s.distanceRemaining || '') + '').trim();
       pts.push({ x, y, n: s.strokeNumber, tip: isFrom ? `${tipPrefix}Hole ${h.holeNumber} tee` :
+        isDrop ? `${tipPrefix}${s.playByPlay || 'drop'}` :
         `${tipPrefix}#${s.strokeNumber} · ${s.distance || ''}${holed ? ' · holed' : (s.toLocation ? ` · ${s.toLocation}` : '')}` });
     };
     add(ov.fromCoords, true);
