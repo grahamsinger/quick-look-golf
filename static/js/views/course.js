@@ -101,7 +101,7 @@ function holePoints(h, toPt, tipPrefix = '') {
       if (isFrom && pts.length) return;
       const holed = !((s.distanceRemaining || '') + '').trim();
       pts.push({ x, y, n: s.strokeNumber, tip: isFrom ? `${tipPrefix}Hole ${h.holeNumber} tee` :
-        isDrop ? `${tipPrefix}${s.playByPlay || 'drop'}` :
+        isDrop ? `${tipPrefix}${s.playByPlay || (s.strokeType || 'drop').toLowerCase()}` :
         `${tipPrefix}#${s.strokeNumber} · ${s.distance || ''}${holed ? ' · holed' : (s.toLocation ? ` · ${s.toLocation}` : '')}` });
     };
     add(ov.fromCoords, true);

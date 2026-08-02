@@ -33,28 +33,33 @@ function shotCell(strokes, i, par) {
   else if (isPutt) { res = shotDist(s.distanceRemaining) + ' left'; cls = ''; }
   else { const r = shotResult(s.toLocation); res = r.label; cls = r.cls; }
   const p3 = (i === 0 && par === 3) ? '<sup class="p3" title="par-3 tee shot — an iron/hybrid, not a drive">P3</sup>' : '';
-  const drop = s.dropNote ? `<sup class="p3" title="${esc(`played after a drop — ${s.dropNote}`)}">D</sup>` : '';
+  const notes = (s.preNotes || []).map(n => `<sup class="p3" title="${esc(n.text)}">${esc(n.mark)}</sup>`).join('');
   const tip = [`#${s.strokeNumber}`, `${s.fromLocation || '?'} → ${isHoled ? 'holed' : (s.toLocation || '?')}`,
     s.distance ? `${s.distance} shot` : '', bs ? `ball ${s.radarData.ballSpeed} mph` : '',
-    s.dropNote ? `after a drop (${s.dropNote})` : '', s.playByPlay || '']
+    ...(s.preNotes || []).map(n => n.text), s.playByPlay || '']
     .filter(Boolean).join(' · ');
   return `<td class="scell" title="${esc(tip)}">
-    <span class="sc-v">${esc(primary)}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}${drop}</span>
+    <span class="sc-v">${esc(primary)}${unit ? `<span class="sc-u">${unit}</span>` : ''}${p3}${notes}</span>
     <span class="sc-r r-${cls}">${esc(res)}</span>
   </td>`;
 }
 
-// Only actual swings get a shot column. ShotLink interleaves non-stroke
-// entries (strokeType DROP — a free-relief/penalty drop, sharing the prior
-// shot's strokeNumber); folding one into a column made a 3 read as 4 shots.
-// The drop's story is kept as a marker + tooltip on the shot played after it.
+// Only actual swings get a shot column. HoleStrokeType is STROKE | DROP |
+// PENALTY | PROVISIONAL; the non-STROKE rows aren't swings (a drop shares
+// the prior shot's strokeNumber, a penalty adds to the score with no swing,
+// a provisional may be abandoned) — folding one into a column made a 3 read
+// as 4 shots. Their story is kept as markers + tooltips on the next shot;
+// several can precede one swing (e.g. penalty then drop after a water ball).
+const NOTE_MARK = { DROP: 'D', PENALTY: 'P', PROVISIONAL: 'PV' };
+const NOTE_TEXT = { DROP: 'played after a drop', PENALTY: 'after a penalty stroke', PROVISIONAL: 'provisional ball played' };
 function realStrokes(h) {
   const out = [];
-  let pendingDrop = null;
+  let pending = [];
   (h.strokes || []).forEach(s => {
-    if ((s.strokeType || 'STROKE') !== 'STROKE') { pendingDrop = s; return; }
-    if (pendingDrop) { s = { ...s, dropNote: pendingDrop.playByPlay || 'drop' }; pendingDrop = null; }
-    out.push(s);
+    const t = s.strokeType || 'STROKE';
+    if (t !== 'STROKE') { pending.push({ mark: NOTE_MARK[t] || '•', text: `${NOTE_TEXT[t] || t} — ${s.playByPlay || ''}` }); return; }
+    out.push(pending.length ? { ...s, preNotes: pending } : s);
+    pending = [];
   });
   return out;
 }
@@ -82,7 +87,7 @@ export function renderShots() {
   }).join('');
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole !== 1 ? ` · started hole ${startHole}` : ''} · shot-by-shot</span></div>
-     <div class="caphint">Big number = <b>ball speed</b> (mph) on full swings, otherwise the shot distance / putt length · below it = where it finished (<b class="rg-good">fairway · green</b> / <b class="rg-warn">rough</b> / <b class="rg-bad">sand · penalty</b>) · <sup class="p3">P3</sup> = par-3 tee shot · read a column down to compare (e.g. every tee-shot ball speed)</div>
+     <div class="caphint">Big number = <b>ball speed</b> (mph) on full swings, otherwise the shot distance / putt length · below it = where it finished (<b class="rg-good">fairway · green</b> / <b class="rg-warn">rough</b> / <b class="rg-bad">sand · penalty</b>) · <sup class="p3">P3</sup> = par-3 tee shot · <sup class="p3">D</sup> / <sup class="p3">P</sup> = played after a drop / penalty stroke (penalties count on the score, not as shots) · read a column down to compare (e.g. every tee-shot ball speed)</div>
      <div class="card shotmatrix"><table class="shots">
        <thead><tr><th>Hole</th><th class="spar-h">Par</th>${shotHdrs}<th>Score</th></tr></thead>
        <tbody>${rows}</tbody>
