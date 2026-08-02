@@ -132,3 +132,15 @@ Click a hole on the course overview to zoom into that hole's own aerial:
 - ‹ › steps through holes, "‹ Full course" zooms back out (snapping "All
   rounds" back to the latest played round, which the overview requires), and
   `?h=` in the URL deep-links straight into a hole.
+
+## Aug 2026 — per-player round options
+
+Fixed: the round ‹ › arrows walked the *tournament's* rounds, so for a player
+whose last played round was behind the field (missed cut, or not yet teed off
+in the current round) the › arrow stepped into a data-less round, the no-data
+fallback snapped it straight back, and **"All rounds" was unreachable**. The
+round picker now builds its options from the *selected player's* leaderboard
+strokes list (plus their in-progress round), so the arrows only walk rounds
+that exist for that player and "All rounds" is always one step past their
+last one. Options rebuild on every player switch; a selected round past the
+new player's last one clamps down to it.

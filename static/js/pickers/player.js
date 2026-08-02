@@ -13,7 +13,12 @@ export function syncPlayerBtn() { $('playerBtnLabel').textContent = playerLabel(
 
 export function selectPlayer(id) {
   const sel = $('player');
-  if (id && [...sel.options].some(o => o.value === id)) { sel.value = id; syncPlayerBtn(); return true; }
+  if (id && [...sel.options].some(o => o.value === id)) {
+    sel.value = id;
+    syncPlayerBtn();
+    updateRoundOptions();  // round list is per-player (missed cut = fewer rounds)
+    return true;
+  }
   return false;
 }
 
@@ -100,6 +105,7 @@ function choosePlayer(id) {
   if (!id || id === $('player').value) return;
   $('player').value = id;
   syncPlayerBtn();
+  updateRoundOptions();  // round list is per-player (missed cut = fewer rounds)
   loadShots();
 }
 

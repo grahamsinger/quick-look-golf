@@ -258,6 +258,11 @@ def leaderboard(tournamentId: str) -> dict:
                 "today": sd.get("score"),        # today's score to par
                 "todayStrokes": today_strokes,   # today's strokes when thru == "F"
                 "teeTime": sd.get("teeTime"),    # ms timestamp, set before teeing off
+                # per-round strokes ("-" until played) + the player's current
+                # round: lets the client offer only rounds this player has data
+                # for (a missed cut means fewer rounds than the tournament)
+                "rounds": rounds,
+                "currentRound": cur,
             }
         )
     # e.g. "R3" -> 3: the tournament's latest round with data

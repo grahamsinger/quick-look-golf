@@ -27,20 +27,38 @@ export function stepRound(step) {
   loadShots();
 }
 
-// Round options reflect data availability: only rounds 1..maxRound (played so
-// far), plus "All rounds" — except in the per-round views: Shots, and the
-// Course overview (the Course *hole zoom* does offer All rounds — trails
+// Rounds the *selected player* actually has data for — their leaderboard
+// strokes list ("-" until played), plus their in-progress round (mid-round
+// the strokes cell is still "-" but shot data exists). A missed cut means
+// fewer rounds than the tournament, and stepping › must not dead-end on a
+// round the player never played (it made "All rounds" unreachable).
+function playerMaxRound(mx) {
+  const p = (state.players || []).find(x => x.id === $('player').value);
+  if (!p || !Array.isArray(p.rounds)) return mx;
+  let last = 0;
+  p.rounds.forEach((v, i) => { if (v && v !== '-') last = i + 1; });
+  if (p.thru && p.thru !== '-' && p.currentRound) last = Math.max(last, p.currentRound);
+  return Math.min(mx, Math.max(1, last));
+}
+
+// Round options reflect data availability: only rounds the selected player
+// has played, plus "All rounds" — except in the per-round views: Shots, and
+// the Course overview (the Course *hole zoom* does offer All rounds — trails
 // from every round overlay on one hole).
 export function updateRoundOptions() {
   const sel = $('round');
   const cur = sel.value;
-  const mx = maxRound();
+  const mx = playerMaxRound(maxRound());
   const allowAll = state.view !== 'shots' && !(state.view === 'course' && !state.courseHole);
   let html = '';
   for (let r = 1; r <= mx; r++) html += `<option value="${r}">Round ${r}</option>`;
   if (allowAll) html += '<option value="all">All rounds</option>';
   sel.innerHTML = html;
-  sel.value = [...sel.options].some(o => o.value === cur) ? cur : (allowAll ? 'all' : String(mx));
+  // keep the selection when still valid; a numeric round past the player's
+  // last one clamps down to it (not to "all"), anything else falls back
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur
+    : /^\d+$/.test(cur) ? String(mx)
+    : (allowAll ? 'all' : String(mx));
   syncRoundBtn();
   updateRoundNav();
 }
