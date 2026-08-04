@@ -132,6 +132,15 @@ Click a hole on the course overview to zoom into that hole's own aerial:
 - ‹ › steps through holes, "‹ Full course" zooms back out (snapping "All
   rounds" back to the latest played round, which the overview requires), and
   `?h=` in the URL deep-links straight into a hole.
+- **Hole zoom v1.1 (UI pass):** the hole renders **horizontal on desktop**
+  (tee left → green right, like a hole diagram; vertical on narrow viewports,
+  re-rendered on resize). The per-hole world files don't guarantee a
+  direction, so the tee/pin projections decide the rotation — one SVG group
+  transform rotates the aerial and all trails together (the `<img>` was
+  replaced by an in-SVG `<image>` so everything shares one space). Round
+  colors are now reserved for the all-rounds overlay (single round = the
+  classic white trail), marks got zoom-scale weights, and the card hugs the
+  aerial.
 
 ## Aug 2026 — per-player round options
 

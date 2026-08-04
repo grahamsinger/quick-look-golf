@@ -329,9 +329,8 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 /* ---------- course overview (aerial + shot trails) ---------- */
 /* colors here are fixed (they sit on the aerial photo, same in both themes) */
 .card.coursemap { padding: 10px; }
-/* the overview card hugs the aerial instead of leaving dead space beside it
-   (the hole-zoom card keeps full width — its bar + centered portrait need it) */
-.card.coursemap:not(.holemap) { width: fit-content; max-width: 100%; }
+/* both course cards hug the aerial instead of leaving dead space beside it */
+.card.coursemap { width: fit-content; max-width: 100%; }
 .cmwrap { position: relative; width: 980px; max-width: 100%; }
 .cmwrap img { width: 100%; display: block; border-radius: 8px; user-select: none; }
 .cmwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -359,7 +358,13 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .holenav .holetitle { font: 700 14px var(--serif); color: var(--ink); min-width: 62px; text-align: center; }
 .holenav .hstep { padding: 5px 9px; }
 .cmwrap-hole { max-width: 100%; margin: 0 auto; }
-.cmwrap-hole img { width: 100%; height: 100%; object-fit: fill; }
+/* zoom scale: trails aren't clickable here, and marks read better heavier */
+.holemap .chole { cursor: default; }
+.holemap .chole polyline { stroke-width: 6; }
+.holemap .chole:hover polyline { stroke-width: 8; }
+.holemap .cpt { r: 11; }
+.holemap .chole:hover .cpt { r: 13; }
+.holemap .hpin circle { r: 12; }
 /* round trail colors (all-rounds overlay): color follows the round, never
    repainted on hover — validated for adjacent-pair CVD separation */
 .chole.hr { cursor: default; --rc: #F5F1E6; }

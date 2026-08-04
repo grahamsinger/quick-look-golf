@@ -220,16 +220,40 @@ function renderHole(cm) {
     trails.push({ r, h, pts });
   });
 
+  // round colors only mean something in the all-rounds overlay (they have a
+  // legend there); a single round wears the app's classic white trail
   const svgTrails = trails.map(tr =>
-    `<g class="chole hr ${ROUND_CLS[tr.r] || 'r1'}">${trailSvg(tr.pts, 8)}</g>`).join('');
+    `<g class="chole${allMode ? ` hr ${ROUND_CLS[tr.r] || 'r1'}` : ''}">${trailSvg(tr.pts, 8)}</g>`).join('');
 
-  // pin (courseData's marked position) + tee, oriented by the hole world-file
+  // pin (courseData's marked position) + tee, oriented by the hole world-file.
+  // The world files run the hole along the frame but not in a guaranteed
+  // direction — when the tee projects above the pin, rotate the whole aerial
+  // 180° so "tee at the bottom, green at the top" is true at every course.
   const pt2 = cm.pinsTees && cm.pinsTees[holeNum - 1];
-  let marks = '';
+  let marks = '', flip = false;
   if (pt2 && pt2.length >= 4) {
     const [px, py] = holeWorldToPx(hm, pt2[0], pt2[1]);
-    marks = `<g class="hpin"><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="7"/><title>Pin (marked position)</title></g>`;
+    const [, ty] = holeWorldToPx(hm, pt2[2], pt2[3]);
+    flip = ty < py;
+    marks = `<g class="hpin"><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="9"/><title>Pin (marked position)</title></g>`;
   }
+
+  // Desktop gets the hole horizontal (tee left → green right, like a hole
+  // diagram — wide screens are wide); narrow viewports keep it vertical
+  // (tee bottom → green top). One SVG group transform rotates the aerial and
+  // every trail together, and also absorbs the tee-at-the-top flip cases.
+  const landscape = window.innerWidth > 860;
+  let boxW = 1000, boxH = vbH, gT = '';
+  if (landscape) {
+    boxW = vbH; boxH = 1000;
+    gT = flip ? `rotate(-90) translate(-1000 0)` : `rotate(90) translate(0 -${vbH})`;
+  } else if (flip) {
+    gT = `rotate(180 500 ${(vbH / 2).toFixed(1)})`;
+  }
+  const wrapStyle = landscape
+    ? `aspect-ratio:${t.fullH}/${t.fullW};width:980px`
+    : `aspect-ratio:${t.fullW}/${t.fullH};width:calc(74vh * ${(t.fullW / t.fullH).toFixed(4)})`;
+  const orient = landscape ? 'Tee on the left, green on the right' : 'Tee at the bottom, green at the top';
 
   const scoreBit = (h) => {
     if (h.score == null || h.par == null) return '';
@@ -249,7 +273,7 @@ function renderHole(cm) {
 
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Hole <b>${holeNum}</b>${par != null ? ` · par ${par}` : ''} · ${roundMeta}</span></div>
-     <div class="caphint">Tee at the bottom, green at the top · hover a dot for the shot${allMode ? ' · hover a trail to isolate that round' : ''} · aerial: PGA TOUR TOURCAST</div>
+     <div class="caphint">${orient} · hover a dot for the shot${allMode ? ' · hover a trail to isolate that round' : ''} · aerial: PGA TOUR TOURCAST</div>
      <div class="card coursemap holemap">
        <div class="holebar">
          <button type="button" class="hback">‹ Full course</button>
@@ -261,14 +285,26 @@ function renderHole(cm) {
          ${legend}
        </div>
        ${noData}
-       <div class="cmwrap cmwrap-hole" style="aspect-ratio:${t.fullW}/${t.fullH};width:min(100%, calc(74vh * ${(t.fullW / t.fullH).toFixed(4)}))">
-         <img src="${esc(hm.imageUrl)}" alt="Hole ${holeNum} aerial" draggable="false" />
-         <svg viewBox="0 0 1000 ${vbH}" preserveAspectRatio="none" role="img" aria-label="Shot trails over the hole aerial">${marks}${svgTrails}</svg>
+       <div class="cmwrap cmwrap-hole" style="${wrapStyle}">
+         <svg viewBox="0 0 ${boxW} ${boxH}" preserveAspectRatio="none" role="img" aria-label="Shot trails over the hole aerial">
+           <g${gT ? ` transform="${gT}"` : ''}>
+             <image href="${esc(hm.imageUrl)}" x="0" y="0" width="1000" height="${vbH}" preserveAspectRatio="none"/>
+             ${marks}${svgTrails}
+           </g>
+         </svg>
        </div>
      </div>`;
   $('out').querySelector('.hback').addEventListener('click', zoomOut);
   $('out').querySelectorAll('.hstep').forEach(b => b.addEventListener('click', () => stepHole(Number(b.dataset.hstep))));
 }
+
+// the hole zoom picks landscape/portrait from the viewport — re-render when
+// a resize crosses the breakpoint (cheap: all data is cached by then)
+let rzT;
+window.addEventListener('resize', () => {
+  clearTimeout(rzT);
+  rzT = setTimeout(() => { if (state.view === 'course' && state.courseHole) renderCourse(); }, 150);
+});
 
 // --- entry -----------------------------------------------------------------
 
