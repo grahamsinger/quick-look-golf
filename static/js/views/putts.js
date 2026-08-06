@@ -68,7 +68,7 @@ export function renderPutts() {
   const sp = proxSplit(d.holes);
   const spTxt = proxSplitLabel(sp);
   $('out').innerHTML =
-    `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts${spTxt ? ` · avg 1st putt ${spTxt}` : ''}</span></div>
+    `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b>${startHole && startHole !== 1 ? ` · started hole ${startHole}` : ''} · first putts${d.madePuttFeet != null ? ` · <b>${d.madePuttFeet} ft</b> of putts made` : ''}${spTxt ? ` · avg 1st putt ${spTxt}` : ''}</span></div>
      ${shortestMissedPanel((d.shortestMissed || []).slice(0, 5))}
      <div class="caphint"><b>Had</b> = distance to the pin before the shot (<b class="hgs">sand</b> = greenside chip/pitch) · <b>Proximity</b> = how close it finished, judged against the tour average from that distance &amp; lie: <span class="q-hot">▴ beat it</span> / <span class="q-cold">▾ well outside</span> · <b>Putts</b> = putts taken · <b class="made">green</b> row = 1-putt · <b class="tp">red</b> = 3-putt+</div>
      <div class="card scorecard">${front}${back}</div>`;
