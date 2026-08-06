@@ -347,9 +347,11 @@ def putts(
             length_ft = _parse_feet(strokes[gi - 1].get("distanceRemaining"))
             if length_ft is None:
                 continue
-            # what the putt was FOR: holing the stroke at index gi would have
-            # closed the hole in gi + 1 strokes
-            for_diff = (gi + 1) - h["par"]
+            # what the putt was FOR: holing it would close the hole in its own
+            # strokeNumber of strokes. Use the feed's number, not the array
+            # index — PENALTY/DROP rows are interleaved in strokes[] and made
+            # a missed bogey putt read "for Double Bogey" after a water ball.
+            for_diff = (strokes[gi].get("strokeNumber") or gi + 1) - h["par"]
             missed_putts.append(
                 {
                     "hole": h["holeNumber"],

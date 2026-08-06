@@ -142,6 +142,20 @@ Click a hole on the course overview to zoom into that hole's own aerial:
   classic white trail), marks got zoom-scale weights, and the card hugs the
   aerial.
 
+## Aug 2026 — non-stroke rows (DROP / PENALTY / PROVISIONAL)
+
+ShotLink interleaves non-swing rows in `strokes[]` (`HoleStrokeType`), which
+had two symptoms once found in the wild:
+
+- **Shots matrix counted a drop as a shot** (an eagle 3 read as 4 shots).
+  Non-STROKE rows now become markers on the next swing (ᴰ drop, ᴾ penalty,
+  ᴾⱽ provisional) with the play-by-play in the tooltip; penalties count on
+  the score, not as columns.
+- **"Shortest missed" mislabeled what a putt was for** after a water ball —
+  the array index over-counted past PENALTY/DROP rows, so a missed bogey
+  putt said "for Double Bogey". The label now uses the feed's own
+  `strokeNumber`.
+
 ## Aug 2026 — per-player round options
 
 Fixed: the round ‹ › arrows walked the *tournament's* rounds, so for a player
