@@ -326,10 +326,17 @@ def putts(
             first_putt_ft = _parse_feet(setup.get("distanceRemaining"))
             approach_dist = setup.get("distance")
             approach_from = setup.get("fromLocation")
-            # distance-to-pin before the shot = the previous stroke's remaining,
-            # or the full hole length if it was the first stroke (e.g. a par-3 tee shot)
+            # distance-to-pin before the shot = the previous row's remaining,
+            # or the full hole length if it was the first stroke (e.g. a par-3
+            # tee shot). A DROP row here is right (post-drop distance = what
+            # the player actually had); a PENALTY row has no remaining at all,
+            # so walk back to the nearest row that does.
             if green_idx >= 2:
-                approach_had = strokes[green_idx - 2].get("distanceRemaining")
+                for prev in range(green_idx - 2, -1, -1):
+                    rem = strokes[prev].get("distanceRemaining")
+                    if (rem or "").strip():
+                        approach_had = rem
+                        break
             elif h.get("yardage"):
                 approach_had = f"{h['yardage']} yds"
 
