@@ -16,6 +16,7 @@ GET  /api/shots?tournamentId=R2026525&playerId=46046&round=1&radar=true
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -106,9 +107,23 @@ _redis = redis.Redis(
 # control (a machine reboot emptied it once). Entries cached with no TTL are
 # immutable — final rounds, course/hole maps — so those are also written to a
 # local SQLite file and read back through on a Redis miss (backfilling Redis).
-# Live entries (30s TTL) stay Redis-only. Everything degrades gracefully:
-# with SQLite unavailable this behaves exactly as before.
+# Live entries (30s TTL) stay Redis-only.
+#
+# Both tiers are best-effort: a cache failure must never fail the request
+# (the fallback is the PGA API). But best-effort must not mean invisible —
+# a co-tenant once disabled Redis persistence and nobody knew for a month —
+# so failures are caught NARROWLY (a bug in our own code should still raise)
+# and each failing site logs one warning per process into server.log.
 _DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cache.sqlite"
+_DISK_ERRORS = (sqlite3.Error, OSError)
+_log = logging.getLogger("golf.cache")
+_tier_warned: set[str] = set()
+
+
+def _tier_warn(site: str, exc: Exception) -> None:
+    if site not in _tier_warned:
+        _tier_warned.add(site)
+        _log.warning("cache tier degraded (%s): %s — continuing without it", site, exc)
 
 
 def _disk() -> sqlite3.Connection:
@@ -124,8 +139,8 @@ try:
             "CREATE TABLE IF NOT EXISTS cache ("
             "key TEXT PRIMARY KEY, value TEXT NOT NULL, created_at INTEGER NOT NULL)"
         )
-except Exception:
-    pass
+except _DISK_ERRORS as _e:
+    _tier_warn("sqlite-init", _e)
 
 
 def _cache_get(key: str) -> str | None:
@@ -133,20 +148,21 @@ def _cache_get(key: str) -> str | None:
         hit = _redis.get(key)
         if hit is not None:
             return hit
-    except Exception:
-        pass
+    except redis.RedisError as e:
+        _tier_warn("redis-get", e)
     try:
         with _disk() as c:
             row = c.execute("SELECT value FROM cache WHERE key = ?", (key,)).fetchone()
-        if row is None:
-            return None
-        try:
-            _redis.set(key, row[0])  # backfill the hot tier
-        except Exception:
-            pass
-        return row[0]
-    except Exception:
+    except _DISK_ERRORS as e:
+        _tier_warn("sqlite-get", e)
         return None
+    if row is None:
+        return None
+    try:
+        _redis.set(key, row[0])  # backfill the hot tier
+    except redis.RedisError as e:
+        _tier_warn("redis-backfill", e)
+    return row[0]
 
 
 def _cache_set(key: str, value: str, ttl: int | None = None) -> None:
@@ -155,8 +171,8 @@ def _cache_set(key: str, value: str, ttl: int | None = None) -> None:
             _redis.setex(key, ttl, value)  # short-lived (in-progress round)
         else:
             _redis.set(key, value)  # no expiry: final rounds are immutable
-    except Exception:
-        pass
+    except redis.RedisError as e:
+        _tier_warn("redis-set", e)
     if not ttl:  # immutable entries also go to disk
         try:
             with _disk() as c:
@@ -164,20 +180,20 @@ def _cache_set(key: str, value: str, ttl: int | None = None) -> None:
                     "INSERT OR REPLACE INTO cache (key, value, created_at) VALUES (?, ?, ?)",
                     (key, value, int(time.time())),
                 )
-        except Exception:
-            pass
+        except _DISK_ERRORS as e:
+            _tier_warn("sqlite-set", e)
 
 
 def _cache_del(key: str) -> None:
     try:
         _redis.delete(key)
-    except Exception:
-        pass
+    except redis.RedisError as e:
+        _tier_warn("redis-del", e)
     try:
         with _disk() as c:
             c.execute("DELETE FROM cache WHERE key = ?", (key,))
-    except Exception:
-        pass
+    except _DISK_ERRORS as e:
+        _tier_warn("sqlite-del", e)
 
 
 def _round_final(data: dict) -> bool:
