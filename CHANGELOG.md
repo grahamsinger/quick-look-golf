@@ -166,6 +166,19 @@ two median deltas linearly along the tee→pin axis. Round-to-round cup
 differences survive, corrections are capped at 40 m, and courses whose
 config checked out are left untouched — their data is ground truth.
 
+## Aug 2026 — manual per-hole nudge (hole zoom)
+
+Auto-calibration can only be as accurate as the course model's marked
+tee/pin points, and those are themselves off by ±10–15 m on the odd hole
+(Sedgefield 16's marked tee sits a box left of where they played). An
+**adjust** button in the hole bar lets you drag the aerial to slide that
+hole's trails into place; the drag is unwound through the display rotation
+and the hole world-file back to world meters and saved per (tournament,
+hole) in localStorage — it re-applies on every visit, on top of the
+automatic corrections, with a **reset** to clear. Also: JS/CSS now ship
+`Cache-Control: no-cache`, so deploys can't leave the browser running
+half-old modules (stale trails after an update were exactly that).
+
 ## Aug 2026 — durable cache tier (SQLite under Redis)
 
 A machine reboot emptied the shared local Redis (its snapshot policy and

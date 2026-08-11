@@ -228,8 +228,19 @@ function renderFullCourse(cm) {
 
 const ROUND_CLS = { 1: 'r1', 2: 'r2', 3: 'r3', 4: 'r4' };
 
+// Manual per-hole nudge — the last-resort polish. Auto-calibration can only
+// be as accurate as the course model's marked tee/pin points, and those are
+// themselves off by ±10–15 m on some holes (in different directions), so the
+// user can drag a hole's trails into place; the world-space delta persists
+// per (tournament, hole) in localStorage and applies on top of everything.
+const ADJ_LS = 'fairway-hole-adjust';
+let adjustMode = false;
+function loadAdj() { try { return JSON.parse(localStorage.getItem(ADJ_LS)) || {}; } catch (e) { return {}; } }
+function saveAdj(map) { try { localStorage.setItem(ADJ_LS, JSON.stringify(map)); } catch (e) { /* private mode etc. */ } }
+
 function zoomToHole(holeNum) {
   state.courseHole = holeNum;
+  adjustMode = false;
   updateRoundOptions();  // the hole view offers "All rounds"
   renderCourse();
   syncUrl();
@@ -237,6 +248,7 @@ function zoomToHole(holeNum) {
 
 function zoomOut() {
   state.courseHole = null;
+  adjustMode = false;
   const wasAll = $('round').value === 'all';
   updateRoundOptions();  // drops "All rounds", snaps to the latest round
   if (wasAll) { loadShots(); return; }  // syncs URL + re-renders on completion
@@ -281,9 +293,13 @@ function renderHole(cm) {
   // when the config was wrong enough to override, also refine along this hole
   const off = calibratedOffset(cm, rounds.flatMap(r => (roundsData[r] || {}).holes || []));
   const corr = off !== cm.offset ? holeCorrection(cm, off, holeNum, roundsData, rounds) : null;
+  const adjMap = loadAdj();
+  const adjKey = `${tid}:${holeNum}`;
+  const manual = adjMap[adjKey];  // user's saved world-space nudge for this hole
   const toPt = (tx, ty) => {
     let [wx, wy] = shotToWorld(cm, off, tx, ty);
     if (corr) { const [dx, dy] = corr(wx, wy); wx -= dx; wy -= dy; }
+    if (manual) { wx -= manual.x; wy -= manual.y; }
     return holeWorldToPx(hm, wx, wy);
   };
   const trails = [];
@@ -350,7 +366,9 @@ function renderHole(cm) {
 
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Hole <b>${holeNum}</b>${par != null ? ` · par ${par}` : ''} · ${roundMeta}</span></div>
-     <div class="caphint">${orient} · hover a dot for the shot${allMode ? ' · hover a trail to isolate that round' : ''} · aerial: PGA TOUR TOURCAST</div>
+     <div class="caphint">${adjustMode
+       ? '<b>Adjust:</b> drag the aerial to slide this hole’s trails into place · saved for this hole on this device · <b>done</b> finishes'
+       : `${orient} · hover a dot for the shot${allMode ? ' · hover a trail to isolate that round' : ''}${manual ? ' · manually adjusted' : ''} · aerial: PGA TOUR TOURCAST`}</div>
      <div class="card coursemap holemap">
        <div class="holebar">
          <button type="button" class="hback">‹ Full course</button>
@@ -360,19 +378,69 @@ function renderHole(cm) {
            <button type="button" class="hstep" data-hstep="1" aria-label="Next hole">›</button>
          </div>
          ${legend}
+         <span class="hadjwrap">
+           <button type="button" class="hadj${adjustMode ? ' on' : ''}" title="Nudge this hole's trails if they sit off the aerial">${adjustMode ? 'done' : 'adjust'}</button>
+           ${manual && !adjustMode ? '<button type="button" class="hadjreset" title="Remove the saved adjustment">reset</button>' : ''}
+         </span>
        </div>
        ${noData}
        <div class="cmwrap cmwrap-hole" style="${wrapStyle}">
          <svg viewBox="0 0 ${boxW} ${boxH}" preserveAspectRatio="none" role="img" aria-label="Shot trails over the hole aerial">
            <g${gT ? ` transform="${gT}"` : ''}>
              <image href="${esc(hm.imageUrl)}" x="0" y="0" width="1000" height="${vbH}" preserveAspectRatio="none"/>
-             ${marks}${svgTrails}
+             ${marks}<g class="adjlayer">${svgTrails}</g>
            </g>
          </svg>
        </div>
      </div>`;
   $('out').querySelector('.hback').addEventListener('click', zoomOut);
   $('out').querySelectorAll('.hstep').forEach(b => b.addEventListener('click', () => stepHole(Number(b.dataset.hstep))));
+  $('out').querySelector('.hadj').addEventListener('click', () => { adjustMode = !adjustMode; renderCourse(); });
+  const resetBtn = $('out').querySelector('.hadjreset');
+  if (resetBtn) resetBtn.addEventListener('click', () => { delete adjMap[adjKey]; saveAdj(adjMap); renderCourse(); });
+
+  if (adjustMode) {
+    // Drag anywhere on the aerial to slide the trails; the screen delta is
+    // unwound through the display rotation and the hole world-file back to
+    // world meters, then saved so it re-applies on every future visit.
+    const svgEl = $('out').querySelector('.cmwrap-hole svg');
+    const layer = svgEl.querySelector('.adjlayer');
+    const screenToPortrait = (ux, uy) =>
+      !landscape ? (flip ? [-ux, -uy] : [ux, uy])
+      : (flip ? [-uy, ux] : [uy, -ux]);
+    let drag = null;
+    svgEl.style.cursor = 'grab';
+    const delta = (e) => {
+      const rect = svgEl.getBoundingClientRect();
+      return [(e.clientX - drag.x) * boxW / rect.width, (e.clientY - drag.y) * boxH / rect.height];
+    };
+    svgEl.addEventListener('pointerdown', (e) => {
+      drag = { x: e.clientX, y: e.clientY };
+      svgEl.setPointerCapture(e.pointerId);
+      svgEl.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    svgEl.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const [px, py] = screenToPortrait(...delta(e));
+      layer.setAttribute('transform', `translate(${px} ${py})`);
+    });
+    const finish = (e) => {
+      if (!drag) return;
+      const [px, py] = screenToPortrait(...delta(e));
+      drag = null;
+      // portrait viewBox units → full-raster px → world meters (tfw linear part)
+      const rx = px * t.fullW / 1000, ry = py * t.fullW / 1000;
+      const dwx = t.a * rx + t.b * ry, dwy = t.d * rx + t.e * ry;
+      if (!dwx && !dwy) return;
+      const cur = adjMap[adjKey] || { x: 0, y: 0 };
+      adjMap[adjKey] = { x: cur.x - dwx, y: cur.y - dwy };
+      saveAdj(adjMap);
+      renderCourse();
+    };
+    svgEl.addEventListener('pointerup', finish);
+    svgEl.addEventListener('pointercancel', () => { drag = null; renderCourse(); });
+  }
 }
 
 // the hole zoom picks landscape/portrait from the viewport — re-render when

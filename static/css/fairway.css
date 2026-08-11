@@ -383,6 +383,10 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .rlegchip .sw.r2 { background: #FFD34D; }
 .rlegchip .sw.r3 { background: #5BC0EB; }
 .rlegchip .sw.r4 { background: #F2709C; }
+/* manual nudge controls sit at the far end of the hole bar */
+.hadjwrap { margin-left: auto; display: inline-flex; gap: 8px; }
+.holebar .hadj.on { background: var(--pine); color: #F4EFE2; border-color: var(--pine); }
+.holebar .hadjreset { color: var(--ink-3); }
 
 /* matrix */
 .mxkey { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; color: var(--ink-3); font-size: 12px; margin: 14px 2px 14px; }
