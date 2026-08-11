@@ -58,28 +58,44 @@ const med = a => a.sort((p, q) => p - q)[Math.floor(a.length / 2)];
 
 // Hole-zoom refinement, only for courses whose config already proved wrong
 // (the global calibration fired): even after the global fix, Sedgefield
-// keeps per-hole systematic error (2–18 m — enough to put a holed putt off
-// the green, which is physically impossible). This hole's own holed-out
-// shots re-center the finishing cluster on its marked pin; round-to-round
-// cup differences are preserved, and a rogue row can't move a hole > 40 m.
-function holeRefinedOffset(cm, off, holeNum, roundsData, rounds) {
+// keeps residual error that varies not just per hole but ALONG a hole —
+// one translation that fixed a green pushed that hole's tee off its box.
+// Both ends have ground truth (stroke 1 starts at the marked tee, the
+// holed-out shot ends beside the marked pin), so the correction blends the
+// two median deltas linearly along the tee→pin axis. Round-to-round cup
+// differences survive, and a rogue row can't warp a hole more than 40 m.
+// Returns a (wx, wy) → [dx, dy] correction, or null for none.
+function holeCorrection(cm, off, holeNum, roundsData, rounds) {
   const pt = cm.pinsTees && cm.pinsTees[holeNum - 1];
-  if (!pt || pt.length < 2) return off;
-  const dx = [], dy = [];
+  if (!pt || pt.length < 4) return null;
+  const dPin = { x: [], y: [] }, dTee = { x: [], y: [] };
   rounds.forEach(r => {
     const h = ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === holeNum);
     if (!h) return;
-    const fin = (h.strokes || []).filter(s => (s.strokeType || 'STROKE') === 'STROKE'
-      && !((s.distanceRemaining || '') + '').trim());
+    const strokes = (h.strokes || []).filter(s => (s.strokeType || 'STROKE') === 'STROKE');
+    const fc = strokes.length && ((strokes[0].overview || {}).leftToRightCoords || {}).fromCoords;
+    if (fc && fc.tourcastX != null) {
+      dTee.x.push(0.3048 * fc.tourcastX - off.x - pt[2]);
+      dTee.y.push(0.3048 * fc.tourcastY - off.y - pt[3]);
+    }
+    const fin = strokes.filter(s => !((s.distanceRemaining || '') + '').trim());
     const c = fin.length && ((fin[fin.length - 1].overview || {}).leftToRightCoords || {}).toCoords;
-    if (!c || c.tourcastX == null) return;
-    dx.push(0.3048 * c.tourcastX - off.x - pt[0]);
-    dy.push(0.3048 * c.tourcastY - off.y - pt[1]);
+    if (c && c.tourcastX != null) {
+      dPin.x.push(0.3048 * c.tourcastX - off.x - pt[0]);
+      dPin.y.push(0.3048 * c.tourcastY - off.y - pt[1]);
+    }
   });
-  if (!dx.length) return off;
-  const ax = med(dx), ay = med(dy);
-  if (Math.hypot(ax, ay) > 40) return off;
-  return { x: off.x + ax, y: off.y + ay };
+  const mk = d => d.x.length ? { x: med(d.x), y: med(d.y) } : null;
+  const ok = v => v && Math.hypot(v.x, v.y) <= 40 ? v : null;
+  let p = ok(mk(dPin)), te = ok(mk(dTee));
+  if (!p && !te) return null;
+  p = p || te; te = te || p;  // one anchor end missing → uniform correction
+  const ax = pt[2], ay = pt[3], vx = pt[0] - ax, vy = pt[1] - ay;
+  const len2 = vx * vx + vy * vy || 1;
+  return (wx, wy) => {
+    const t = Math.max(0, Math.min(1, ((wx - ax) * vx + (wy - ay) * vy) / len2));
+    return [te.x + (p.x - te.x) * t, te.y + (p.y - te.y) * t];
+  };
 }
 
 // world meters -> hole-image space, normalized to a 1000-wide viewBox. The
@@ -262,12 +278,14 @@ function renderHole(cm) {
   // one trail per round that has data on this hole
   const rounds = Object.keys(roundsData).map(Number).sort((a, b) => a - b);
   // calibrate from every loaded round's holed-out anchors (more = steadier);
-  // when the config was wrong enough to override, also refine per hole
-  const globalOff = calibratedOffset(cm, rounds.flatMap(r => (roundsData[r] || {}).holes || []));
-  const off = globalOff !== cm.offset
-    ? holeRefinedOffset(cm, globalOff, holeNum, roundsData, rounds)
-    : globalOff;
-  const toPt = (tx, ty) => { const [wx, wy] = shotToWorld(cm, off, tx, ty); return holeWorldToPx(hm, wx, wy); };
+  // when the config was wrong enough to override, also refine along this hole
+  const off = calibratedOffset(cm, rounds.flatMap(r => (roundsData[r] || {}).holes || []));
+  const corr = off !== cm.offset ? holeCorrection(cm, off, holeNum, roundsData, rounds) : null;
+  const toPt = (tx, ty) => {
+    let [wx, wy] = shotToWorld(cm, off, tx, ty);
+    if (corr) { const [dx, dy] = corr(wx, wy); wx -= dx; wy -= dy; }
+    return holeWorldToPx(hm, wx, wy);
+  };
   const trails = [];
   let par = null;
   rounds.forEach(r => {

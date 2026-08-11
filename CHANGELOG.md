@@ -157,11 +157,14 @@ error is pure translation — and 3M/Detroit keep their configs.
 
 On such courses a **per-hole refinement** kicks in for the hole zoom: no
 global transform (even a full affine over 144 anchors — rms stays ~9 m)
-explains Sedgefield's remaining per-hole error (2–18 m, enough to put a
-holed putt off the green). Each hole's own holed-out shots re-center its
-finishing cluster on the marked pin, preserving round-to-round cup
-differences, capped at 40 m. Courses whose config checked out are left
-untouched — their data is ground truth.
+explains Sedgefield's remaining error, which varies per hole (2–18 m,
+enough to put a holed putt off the green) **and along a hole** (a uniform
+per-hole shift that fixed a green pushed that hole's tee off its box).
+Both ends have ground truth — stroke 1 starts at the marked tee, the
+holed-out shot ends beside the marked pin — so the correction blends the
+two median deltas linearly along the tee→pin axis. Round-to-round cup
+differences survive, corrections are capped at 40 m, and courses whose
+config checked out are left untouched — their data is ground truth.
 
 ## Aug 2026 — durable cache tier (SQLite under Redis)
 
