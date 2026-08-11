@@ -88,9 +88,12 @@ export async function loadTournaments(preferredId) {
   try {
     const { tournaments } = await api(`/api/schedule?year=${encodeURIComponent(year)}`);
     state.tournaments = tournaments.slice().reverse();  // most recent first
-    // preferred (deep link) → live event → most recent
+    // preferred (deep link) → live event → most recent *played* — the season
+    // schedule includes future NOT_STARTED events, so "most recent" alone
+    // would land on an upcoming tournament with no data
     const def = (preferredId && state.tournaments.find(t => t.id === preferredId))
       || state.tournaments.find(t => t.tournamentStatus === 'IN_PROGRESS')
+      || state.tournaments.find(t => t.tournamentStatus === 'COMPLETED')
       || state.tournaments[0];
     if (def) selectTourn(def.id, { load: false });
     status(`${tournaments.length} tournaments in ${year}.`);
