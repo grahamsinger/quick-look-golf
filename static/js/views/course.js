@@ -23,10 +23,36 @@ function worldToPx(cm, wx, wy) {
 // it, so relative to the aerial it cancels. Verified empirically — a Kabsch
 // fit of shot pins vs courseData pins at TPC Twin Cities (config rotate
 // -0.157 rad) gives rotation ≈ 0 and translation = -offset to within 30 cm.
-const shotToWorld = (cm, tx, ty) => [0.3048 * tx - cm.offset.x, 0.3048 * ty - cm.offset.y];
-function shotToPx(cm, tx, ty) {
-  const [wx, wy] = shotToWorld(cm, tx, ty);
+const shotToWorld = (cm, off, tx, ty) => [0.3048 * tx - off.x, 0.3048 * ty - off.y];
+function shotToPx(cm, off, tx, ty) {
+  const [wx, wy] = shotToWorld(cm, off, tx, ty);
   return worldToPx(cm, wx, wy);
+}
+
+// Some tournaments ship a wrong offsetConfig (Sedgefield's was ~70 m off —
+// trails started on houses). Every holed-out shot is a ground-truth anchor:
+// it ended in the cup, beside that hole's marked pin in courseData. The
+// median implied offset across a round's holes is robust to daily pin moves
+// (~10 m scatter), so when it disagrees with the config by more than pin
+// noise can explain (25 m), trust the shots instead of the config.
+function calibratedOffset(cm, holesList) {
+  if (cm._cal) return cm._cal;
+  const xs = [], ys = [];
+  (holesList || []).forEach(h => {
+    const pt = cm.pinsTees && cm.pinsTees[h.holeNumber - 1];
+    if (!pt || pt.length < 2) return;
+    const fin = (h.strokes || []).filter(s => (s.strokeType || 'STROKE') === 'STROKE'
+      && !((s.distanceRemaining || '') + '').trim());
+    const c = fin.length && ((fin[fin.length - 1].overview || {}).leftToRightCoords || {}).toCoords;
+    if (!c || c.tourcastX == null) return;
+    xs.push(0.3048 * c.tourcastX - pt[0]);
+    ys.push(0.3048 * c.tourcastY - pt[1]);
+  });
+  if (xs.length < 6) return cm.offset;  // too few anchors — don't memoize either
+  const med = a => a.sort((p, q) => p - q)[Math.floor(a.length / 2)];
+  const mx = med(xs), my = med(ys);
+  cm._cal = Math.hypot(mx - cm.offset.x, my - cm.offset.y) > 25 ? { x: mx, y: my } : cm.offset;
+  return cm._cal;
 }
 
 // world meters -> hole-image space, normalized to a 1000-wide viewBox. The
@@ -125,8 +151,9 @@ function renderFullCourse(cm) {
   const holes = (d && d.holes) || [];
   if (!holes.length) { $('out').innerHTML = '<div class="summary"><span class="meta">No shot data for this round.</span></div>'; return; }
 
+  const off = calibratedOffset(cm, holes);
   const groups = holes
-    .map(h => ({ h, pts: holePoints(h, (tx, ty) => shotToPx(cm, tx, ty)) }))
+    .map(h => ({ h, pts: holePoints(h, (tx, ty) => shotToPx(cm, off, tx, ty)) }))
     .filter(g => g.pts.length > 1);
 
   const trail = (g) => {
@@ -205,10 +232,11 @@ function renderHole(cm) {
 
   const t = hm.tfw;
   const vbH = Math.round(1000 * t.fullH / t.fullW);
-  const toPt = (tx, ty) => { const [wx, wy] = shotToWorld(cm, tx, ty); return holeWorldToPx(hm, wx, wy); };
-
   // one trail per round that has data on this hole
   const rounds = Object.keys(roundsData).map(Number).sort((a, b) => a - b);
+  // calibrate from every loaded round's holed-out anchors (more = steadier)
+  const off = calibratedOffset(cm, rounds.flatMap(r => (roundsData[r] || {}).holes || []));
+  const toPt = (tx, ty) => { const [wx, wy] = shotToWorld(cm, off, tx, ty); return holeWorldToPx(hm, wx, wy); };
   const trails = [];
   let par = null;
   rounds.forEach(r => {

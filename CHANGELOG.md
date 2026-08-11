@@ -142,6 +142,19 @@ Click a hole on the course overview to zoom into that hole's own aerial:
   classic white trail), marks got zoom-scale weights, and the card hugs the
   aerial.
 
+## Aug 2026 — self-calibrating course offset
+
+Sedgefield (Wyndham) shipped an `offsetConfig` that was **~72 m wrong** —
+trails started on houses and putts ended a green short (first course where
+the config didn't match reality; Detroit was right to ~2 m, 3M to ~16 m).
+The Course view now **self-calibrates**: every holed-out shot is a
+ground-truth anchor (it ended in the cup, beside that hole's marked pin in
+courseData), so the median implied offset across a round's holes gives the
+true translation, robust to daily pin moves. The config is overridden only
+when it disagrees by more than pin noise can explain (25 m). Verified: a
+Kabsch fit over 72 anchors confirms rotation still cancels (≈1°) — the
+error is pure translation — and 3M/Detroit keep their configs.
+
 ## Aug 2026 — durable cache tier (SQLite under Redis)
 
 A machine reboot emptied the shared local Redis (its snapshot policy and
