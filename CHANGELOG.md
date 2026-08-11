@@ -173,6 +173,17 @@ aerial — per-round columns (swatch-labeled in all-rounds mode) with
 numbered strokes ("174 yds to right green, 49 ft 8 in. to hole"), and
 drops/penalties as unnumbered muted lines, like the Tour's own panel.
 
+## Aug 2026 — green view (hole zoom)
+
+"On the green" panel beside the play-by-play: the hole aerial windowed
+~48 m around the marked pin, showing each round from the shot that found
+the green through every putt, at putt scale. No new data or imagery —
+investigation showed the main site's green view plots the same tourcast
+points (`green.*` coords equal `overview.*`; its `enhancedX/Y` normalize
+to a long-dead crop asset, and no green imagery/polygons exist on the
+asset host anymore), so we window our own aerial through the same
+projection, corrections, and rotation as the big view.
+
 ## Aug 2026 — manual per-hole nudge (hole zoom)
 
 Auto-calibration can only be as accurate as the course model's marked

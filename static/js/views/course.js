@@ -348,6 +348,38 @@ function renderHole(cm) {
     : `aspect-ratio:${t.fullW}/${t.fullH};width:calc(74vh * ${(t.fullW / t.fullH).toFixed(4)})`;
   const orient = landscape ? 'Tee on the left, green on the right' : 'Tee at the bottom, green at the top';
 
+  // --- our own "green view": the hole aerial windowed tightly on the green.
+  // The site's green view plots the same tourcast points (verified: green.*
+  // coords equal overview.*) over a long-dead crop asset — so window ours
+  // instead: same image, same projection/corrections/rotation, putt scale.
+  // Each round shows from the shot that found the green through every putt.
+  let greenCard = '';
+  if (pt2 && pt2.length >= 2 && trails.length) {
+    const [gpx, gpy] = holeWorldToPx(hm, pt2[0], pt2[1]);
+    const upm = 1000 / (t.fullW * Math.hypot(t.a, t.d));  // viewBox units per meter
+    const half = 24 * upm;  // 48 m window around the marked pin
+    // the window is a square in the *displayed* space — map the pin's
+    // portrait position through the same rotation the big aerial uses
+    const gc = !landscape ? (flip ? [1000 - gpx, vbH - gpy] : [gpx, gpy])
+      : (flip ? [gpy, 1000 - gpx] : [vbH - gpy, gpx]);
+    const gTrails = trails.map(tr => {
+      const nGreen = (tr.h.strokes || []).filter(s =>
+        (s.fromLocation || '').toLowerCase() === 'green'
+        && ((((s.overview || {}).leftToRightCoords || {}).toCoords) || {}).tourcastX != null).length;
+      const pts = tr.pts.slice(-(nGreen + 1));  // setup shot's finish + every putt
+      return pts.length ? `<g class="chole${allMode ? ` hr ${ROUND_CLS[tr.r] || 'r1'}` : ''}">${trailSvg(pts, 5)}</g>` : '';
+    }).join('');
+    greenCard = `<div class="greencard">
+      <div class="gvhdr">On the green</div>
+      <svg class="greenview" viewBox="${(gc[0] - half).toFixed(1)} ${(gc[1] - half).toFixed(1)} ${(2 * half).toFixed(1)} ${(2 * half).toFixed(1)}" role="img" aria-label="Green detail">
+        <g${gT ? ` transform="${gT}"` : ''}>
+          <image href="${esc(hm.imageUrl)}" x="0" y="0" width="1000" height="${vbH}" preserveAspectRatio="none"/>
+          ${marks}${gTrails}
+        </g>
+      </svg>
+    </div>`;
+  }
+
   const scoreBit = (h) => {
     if (h.score == null || h.par == null) return '';
     const diff = h.score - h.par;
@@ -411,7 +443,7 @@ function renderHole(cm) {
            </g>
          </svg>
        </div>
-       ${pbp}
+       <div class="holeside">${greenCard}${pbp}</div>
      </div>`;
   $('out').querySelector('.hback').addEventListener('click', zoomOut);
   $('out').querySelectorAll('.hstep').forEach(b => b.addEventListener('click', () => stepHole(Number(b.dataset.hstep))));
