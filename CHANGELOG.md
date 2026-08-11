@@ -166,6 +166,13 @@ two median deltas linearly along the tee→pin axis. Round-to-round cup
 differences survive, corrections are capped at 40 m, and courses whose
 config checked out are left untouched — their data is ground truth.
 
+## Aug 2026 — play-by-play under the hole aerial
+
+The hole zoom shows the feed's own shot-by-shot verbiage beneath the
+aerial — per-round columns (swatch-labeled in all-rounds mode) with
+numbered strokes ("174 yds to right green, 49 ft 8 in. to hole"), and
+drops/penalties as unnumbered muted lines, like the Tour's own panel.
+
 ## Aug 2026 — manual per-hole nudge (hole zoom)
 
 Auto-calibration can only be as accurate as the course model's marked

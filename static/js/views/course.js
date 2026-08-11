@@ -364,6 +364,25 @@ function renderHole(cm) {
   const noData = trails.length ? '' :
     '<div class="summary"><span class="meta">No shot trail for this hole in the selected round.</span></div>';
 
+  // shot-by-shot verbiage under the aerial (the feed's own play-by-play);
+  // drops/penalties appear as unnumbered muted lines, like the Tour's panel
+  const pbp = trails.length ? `<div class="pbp">${rounds.map(r => {
+    const h = ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === holeNum);
+    if (!h || !(h.strokes || []).length) return '';
+    const items = h.strokes.map(s => {
+      const real = (s.strokeType || 'STROKE') === 'STROKE';
+      const txt = s.playByPlay || [s.distance, s.toLocation].filter(Boolean).join(' to ')
+        || (s.strokeType || '').toLowerCase();
+      return real
+        ? `<li><b>${s.strokeNumber}</b>${esc(txt)}</li>`
+        : `<li class="pbpx">${esc(txt)}</li>`;
+    }).join('');
+    const hdr = allMode
+      ? `<span class="pbphdr"><i class="sw ${ROUND_CLS[r] || 'r1'}"></i>Round ${r}</span>`
+      : `<span class="pbphdr">Round ${r}</span>`;
+    return `<div class="pbpr">${hdr}<ol>${items}</ol></div>`;
+  }).join('')}</div>` : '';
+
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Hole <b>${holeNum}</b>${par != null ? ` · par ${par}` : ''} · ${roundMeta}</span></div>
      <div class="caphint">${adjustMode
@@ -392,6 +411,7 @@ function renderHole(cm) {
            </g>
          </svg>
        </div>
+       ${pbp}
      </div>`;
   $('out').querySelector('.hback').addEventListener('click', zoomOut);
   $('out').querySelectorAll('.hstep').forEach(b => b.addEventListener('click', () => stepHole(Number(b.dataset.hstep))));

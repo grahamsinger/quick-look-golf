@@ -379,10 +379,16 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 /* legend chips: swatch = round color; score keeps the app's result colors */
 .rleg { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
 .rlegchip { display: inline-flex; align-items: center; gap: 6px; }
-.rlegchip .sw { width: 14px; height: 4px; border-radius: 2px; background: #F5F1E6; box-shadow: 0 0 0 1px rgba(20,20,20,.35); }
-.rlegchip .sw.r2 { background: #FFD34D; }
-.rlegchip .sw.r3 { background: #5BC0EB; }
-.rlegchip .sw.r4 { background: #F2709C; }
+.sw { width: 14px; height: 4px; border-radius: 2px; background: #F5F1E6; box-shadow: 0 0 0 1px rgba(20,20,20,.35); }
+.sw.r2 { background: #FFD34D; }
+.sw.r3 { background: #5BC0EB; }
+.sw.r4 { background: #F2709C; }
+/* play-by-play under the hole aerial */
+.pbp { display: flex; flex-wrap: wrap; gap: 16px 36px; margin: 14px 4px 4px; max-width: 980px; }
+.pbphdr { display: inline-flex; align-items: center; gap: 7px; font: 700 10.5px var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2); }
+.pbpr ol { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12.5px; color: var(--ink-2); }
+.pbpr li b { display: inline-block; min-width: 17px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pbpr li.pbpx { color: var(--ink-3); font-style: italic; padding-left: 17px; }
 /* manual nudge controls sit at the far end of the hole bar */
 .hadjwrap { margin-left: auto; display: inline-flex; gap: 8px; }
 .holebar .hadj.on { background: var(--pine); color: #F4EFE2; border-color: var(--pine); }
