@@ -88,6 +88,13 @@ key. If the scraped API key rotates, the client **re-scrapes and retries
 automatically** on an auth failure. Derived stats (`/api/putts`'s per-hole rows and `shortestMissed`) are
 computed per request from that payload.
 
+Immutable entries (final rounds, course/hole maps) are additionally written to
+a local **SQLite** file (`data/cache.sqlite`, git-ignored) as a durable tier —
+Redis is a shared service whose lifetime the app doesn't control (a reboot can
+empty it), so on a Redis miss the server reads through to SQLite, backfills
+Redis, and only then falls back to the PGA API. Live (TTL'd) entries stay
+Redis-only. Both tiers degrade gracefully if unavailable.
+
 Convenience JSON endpoints: `/api/schedule`, `/api/leaderboard`, `/api/shots`,
 `/api/putts`. Responses carry `X-Cache: HIT|MISS` and `X-Data-Fetched-At` (ms,
 when the payload was captured from PGA — drives the UI's "data current as of").

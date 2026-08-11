@@ -142,6 +142,16 @@ Click a hole on the course overview to zoom into that hole's own aerial:
   classic white trail), marks got zoom-scale weights, and the card hugs the
   aerial.
 
+## Aug 2026 — durable cache tier (SQLite under Redis)
+
+A machine reboot emptied the shared local Redis (its snapshot policy and
+lifetime aren't the app's to control), silently discarding every cached
+tournament. Immutable cache entries — final rounds, course/hole maps — now
+also write to `data/cache.sqlite`; a Redis miss reads through to SQLite,
+backfills Redis, and preserves the original `fetchedAt` (so "data current as
+of" stays the true capture time across reboots). Live 30-second entries stay
+Redis-only, and both tiers degrade gracefully.
+
 ## Aug 2026 — non-stroke rows (DROP / PENALTY / PROVISIONAL)
 
 ShotLink interleaves non-swing rows in `strokes[]` (`HoleStrokeType`), which

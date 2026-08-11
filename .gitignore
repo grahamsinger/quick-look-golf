@@ -7,3 +7,6 @@ __pycache__/
 # runtime artifacts from start.sh
 server.log
 .server.pid
+
+# durable cache tier (rebuilt on demand)
+data/

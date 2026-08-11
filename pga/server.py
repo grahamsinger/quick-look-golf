@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -100,9 +101,50 @@ _redis = redis.Redis(
 )
 
 
+# --- durable tier under Redis ----------------------------------------------
+# Redis is the hot cache, but it's a shared service whose lifetime we don't
+# control (a machine reboot emptied it once). Entries cached with no TTL are
+# immutable — final rounds, course/hole maps — so those are also written to a
+# local SQLite file and read back through on a Redis miss (backfilling Redis).
+# Live entries (30s TTL) stay Redis-only. Everything degrades gracefully:
+# with SQLite unavailable this behaves exactly as before.
+_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cache.sqlite"
+
+
+def _disk() -> sqlite3.Connection:
+    conn = sqlite3.connect(_DB_PATH, timeout=5.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+try:
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _disk() as _c:
+        _c.execute(
+            "CREATE TABLE IF NOT EXISTS cache ("
+            "key TEXT PRIMARY KEY, value TEXT NOT NULL, created_at INTEGER NOT NULL)"
+        )
+except Exception:
+    pass
+
+
 def _cache_get(key: str) -> str | None:
     try:
-        return _redis.get(key)
+        hit = _redis.get(key)
+        if hit is not None:
+            return hit
+    except Exception:
+        pass
+    try:
+        with _disk() as c:
+            row = c.execute("SELECT value FROM cache WHERE key = ?", (key,)).fetchone()
+        if row is None:
+            return None
+        try:
+            _redis.set(key, row[0])  # backfill the hot tier
+        except Exception:
+            pass
+        return row[0]
     except Exception:
         return None
 
@@ -115,11 +157,25 @@ def _cache_set(key: str, value: str, ttl: int | None = None) -> None:
             _redis.set(key, value)  # no expiry: final rounds are immutable
     except Exception:
         pass
+    if not ttl:  # immutable entries also go to disk
+        try:
+            with _disk() as c:
+                c.execute(
+                    "INSERT OR REPLACE INTO cache (key, value, created_at) VALUES (?, ?, ?)",
+                    (key, value, int(time.time())),
+                )
+        except Exception:
+            pass
 
 
 def _cache_del(key: str) -> None:
     try:
         _redis.delete(key)
+    except Exception:
+        pass
+    try:
+        with _disk() as c:
+            c.execute("DELETE FROM cache WHERE key = ?", (key,))
     except Exception:
         pass
 
