@@ -155,6 +155,14 @@ when it disagrees by more than pin noise can explain (25 m). Verified: a
 Kabsch fit over 72 anchors confirms rotation still cancels (≈1°) — the
 error is pure translation — and 3M/Detroit keep their configs.
 
+On such courses a **per-hole refinement** kicks in for the hole zoom: no
+global transform (even a full affine over 144 anchors — rms stays ~9 m)
+explains Sedgefield's remaining per-hole error (2–18 m, enough to put a
+holed putt off the green). Each hole's own holed-out shots re-center its
+finishing cluster on the marked pin, preserving round-to-round cup
+differences, capped at 40 m. Courses whose config checked out are left
+untouched — their data is ground truth.
+
 ## Aug 2026 — durable cache tier (SQLite under Redis)
 
 A machine reboot emptied the shared local Redis (its snapshot policy and
