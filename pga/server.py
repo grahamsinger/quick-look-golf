@@ -587,5 +587,18 @@ def graphiql() -> str:
     return (STATIC_DIR / "graphiql.html").read_text()
 
 
+# Browsers happily reuse cached ES modules across visits, so after a deploy
+# the app could run half-old code until a hard reload (stale hole-9 trails
+# were exactly this). no-cache = revalidate every time: StaticFiles answers
+# unchanged files with a tiny 304, changed ones with fresh bytes.
+@app.middleware("http")
+async def _no_stale_frontend(request, call_next):
+    response = await call_next(request)
+    p = request.url.path
+    if p == "/" or p.endswith((".js", ".css", ".html")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 # Serve the Shot Explorer at "/" and any other static assets under it.
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
