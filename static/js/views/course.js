@@ -410,8 +410,8 @@ function renderHole(cm) {
         : `<li class="pbpx">${esc(txt)}</li>`;
     }).join('');
     const hdr = allMode
-      ? `<span class="pbphdr"><i class="sw ${ROUND_CLS[r] || 'r1'}"></i>Round ${r}</span>`
-      : `<span class="pbphdr">Round ${r}</span>`;
+      ? `<span class="pbphdr"><i class="sw ${ROUND_CLS[r] || 'r1'}"></i>Round ${r}${scoreBit(h)}</span>`
+      : `<span class="pbphdr">Round ${r}${scoreBit(h)}</span>`;
     return `<div class="pbpr">${hdr}<ol>${items}</ol></div>`;
   }).join('')}</div>` : '';
 
