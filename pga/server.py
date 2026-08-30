@@ -582,6 +582,53 @@ def holemap(response: Response, tournamentId: str, hole: int, refresh: bool = Fa
     return out
 
 
+def _fill_others(blk: dict, by_hole: dict[int, int]) -> None:
+    for r in blk["rows"]:
+        if r.get("hole"):
+            r["others"] = by_hole.get(r["hole"], 0)
+        else:
+            rng = (range(1, 10) if r.get("label") == "OUT"
+                   else range(10, 19) if r.get("label") == "IN" else range(1, 19))
+            r["others"] = sum(v for h, v in by_hole.items() if h in rng)
+
+
+def _derive_others(blocks: list[dict]) -> None:
+    """Fill each row's `others` (triple bogey or worse) where it's derivable.
+
+    The API's buckets stop at double bogey, but every player who completed a
+    hole lands in exactly one bucket — so a finished round's field size is
+    the max bucket-sum across its holes, and each hole's shortfall from that
+    is triples+. Derived per round (each round carries its own field size,
+    so cuts are handled), never for a live round (holes the field hasn't
+    reached would masquerade as others); the All Rounds block sums the
+    per-round values and is skipped while any round is live. A mid-round WD
+    can overstate by one on the holes they never played — rare, and a live
+    week self-corrects on the next 30 s re-fetch.
+    """
+    per_round: dict[int, dict[int, int]] = {}
+    for blk in blocks:
+        if not blk["round"] or blk["live"]:
+            continue
+        sums = {
+            r["hole"]: sum(r.get(k) or 0 for k in ("eagles", "birdies", "pars", "bogeys", "doubles"))
+            for r in blk["rows"] if r.get("hole")
+        }
+        if not sums:
+            continue
+        n = max(sums.values())
+        per_round[blk["round"]] = {h: max(0, n - s) for h, s in sums.items()}
+        _fill_others(blk, per_round[blk["round"]])
+    if not per_round or any(b["live"] for b in blocks):
+        return
+    agg: dict[int, int] = {}
+    for m in per_round.values():
+        for h, v in m.items():
+            agg[h] = agg.get(h, 0) + v
+    for blk in blocks:
+        if not blk["round"]:
+            _fill_others(blk, agg)
+
+
 @app.get("/api/coursestats")
 def coursestats(response: Response, tournamentId: str, refresh: bool = False) -> dict:
     """Hole-by-hole field scoring for the week (the site's Course Stats tab):
@@ -590,10 +637,10 @@ def coursestats(response: Response, tournamentId: str, refresh: bool = False) ->
 
     Row order is preserved from the feed (holes 1-9, OUT, 10-18, IN, TOTAL);
     hole rows carry `hole`, summary rows carry `label` instead. `doubles` is
-    exactly double bogeys — triples+ aren't bucketed by the API (the averages
-    still include them).
+    exactly double bogeys — triples+ aren't bucketed by the API, so `others`
+    is derived (see _derive_others) and absent where it can't be.
     """
-    key = f"golf:{CACHE_VERSION}:coursestats:{tournamentId}"
+    key = f"golf:{CACHE_VERSION}:coursestats2:{tournamentId}"
     if refresh:
         _cache_del(key)
     else:
@@ -666,6 +713,7 @@ def coursestats(response: Response, tournamentId: str, refresh: bool = False) ->
                 "live": bool(blk.get("live")),
                 "rows": rows,
             })
+        _derive_others(blocks)
         courses.append({
             "courseId": cr.get("courseId"),
             "courseName": cr.get("courseName"),

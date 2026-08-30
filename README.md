@@ -65,7 +65,8 @@ default. Self-hosted Fraunces display serif.
   events don't publish the imagery and fall back gracefully.
   - **Course stats for the week** under the aerial: per hole — par, yards,
     scoring average, to-par diff, difficulty rank, and
-    eagle/birdie/par/bogey/double counts, with OUT/IN/TOTAL rows and pills for
+    eagle/birdie/par/bogey/double counts plus a derived **T+ "others"** column
+    (triples or worse), with OUT/IN/TOTAL rows and pills for
     **All Rounds** or any single round (per-round yardage shows moved-up
     tees). Click a row to zoom the hole; the hole zoom shows the same numbers
     for the open hole in a **field strip** that follows the round selection.

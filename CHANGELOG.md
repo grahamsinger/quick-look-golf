@@ -248,6 +248,10 @@ query (the site's Course Stats tab — new `/api/coursestats` proxy):
   following the trail selection (all-rounds overlay → All Rounds block,
   single round → that round's block).
 - Caching matches the rest: durable (Redis + SQLite) once rounds 1–4 all
-  have a non-live block, 30 s TTL while the week is still moving. Counts are
-  exact buckets — triples+ aren't bucketed by the API (averages include
-  them).
+  have a non-live block, 30 s TTL while the week is still moving.
+- **T+ ("others") column derived**: the API's buckets stop at double bogey,
+  but every finished hole lands in exactly one bucket — so a completed
+  round's field size = the max bucket-sum across its holes, and each hole's
+  shortfall is triples+. Derived per round (cuts handled — each round
+  carries its own field size), All Rounds sums the rounds; blank ("–") for
+  a live round, where unreached holes would masquerade as others.

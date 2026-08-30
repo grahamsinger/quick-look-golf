@@ -232,7 +232,8 @@ function courseStatsCard(payload, zoomable = true) {
     const mid = `<td class="num">${num(r.par)}</td><td class="num">${num(r.yards)}</td>` +
       `<td class="num avgc">${esc(r.avg || '')}</td><td class="num ${diffCls(r.tendency)}">${fmtDiff(r.diff)}</td>`;
     const counts = `<td class="num">${num(r.eagles)}</td><td class="num">${num(r.birdies)}</td>` +
-      `<td class="num">${num(r.pars)}</td><td class="num">${num(r.bogeys)}</td><td class="num">${num(r.doubles)}</td>`;
+      `<td class="num">${num(r.pars)}</td><td class="num">${num(r.bogeys)}</td><td class="num">${num(r.doubles)}</td>` +
+      `<td class="num">${r.others == null ? '–' : r.others}</td>`;
     return r.hole != null
       ? `<tr${zoomable ? ` data-hole="${r.hole}"` : ''}><td class="hole">${r.hole}</td>${mid}<td class="num">${num(r.rank)}</td>${counts}</tr>`
       : `<tr class="sumrow"><td class="hole">${esc(r.label || '')}</td>${mid}<td></td>${counts}</tr>`;
@@ -243,10 +244,10 @@ function courseStatsCard(payload, zoomable = true) {
       <span class="statspills">${pills}</span></div>
     <table class="cstats">
       <thead><tr><th>Hole</th><th>Par</th><th>Yds</th><th>Avg</th><th>±</th><th title="1 = hardest">Rank</th>
-        <th title="Eagles">E</th><th title="Birdies">B</th><th title="Pars">P</th><th title="Bogeys">Bo</th><th title="Double bogeys">D</th></tr></thead>
+        <th title="Eagles">E</th><th title="Birdies">B</th><th title="Pars">P</th><th title="Bogeys">Bo</th><th title="Double bogeys">D</th><th title="Triple bogey or worse (derived — blank while a round is live)">T+</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="caphint statshint">How the field played each hole · rank <b>1</b> = hardest · E/B/P/Bo/D = eagles → double bogeys (triples+ not bucketed)${zoomable ? ' · click a hole to zoom' : ''}</div>
+    <div class="caphint statshint">How the field played each hole · rank <b>1</b> = hardest · E/B/P/Bo/D = eagles → double bogeys · <b>T+</b> = triples or worse ("others", derived from the field count)${zoomable ? ' · click a hole to zoom' : ''}</div>
   </div>`;
 }
 
@@ -486,7 +487,9 @@ function renderHole(cm) {
         (row.rank ? `<span>${ord(row.rank)} hardest</span>` : '') +
         `<span class="hfc">E <b>${row.eagles}</b></span><span class="hfc">B <b>${row.birdies}</b></span>` +
         `<span class="hfc">P <b>${row.pars}</b></span><span class="hfc">Bo <b>${row.bogeys}</b></span>` +
-        `<span class="hfc">D <b>${row.doubles}</b></span></div>`;
+        `<span class="hfc">D <b>${row.doubles}</b></span>` +
+        (row.others != null ? `<span class="hfc">T+ <b>${row.others}</b></span>` : '') +
+        `</div>`;
     }
   }
 
