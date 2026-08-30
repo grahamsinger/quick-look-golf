@@ -431,17 +431,20 @@ table.fieldgrid .fparrow td { position: sticky; top: 25px; z-index: 3; backgroun
 table.fieldgrid .fparrow .fpos, table.fieldgrid .fparrow .fname { z-index: 4; }
 .frow { cursor: pointer; }
 .frow:hover td { background: var(--card-2); }
-.frow.fsel td { background: var(--turf); }
+/* selected player: mark the name rail only — a full-row tint drowned the
+   birdie/bogey cell colors (they're translucent tints themselves) */
+.frow.fsel .fpos, .frow.fsel .fname { background: var(--turf); }
+.frow.fsel .fpos { box-shadow: inset 3px 0 0 var(--pine); }
 .frow.fsel .fname { font-weight: 700; color: var(--pine); }
 /* cell fill = the score on that hole (the number is the running total) */
 .fc-eag { background: var(--fairway); color: #F4EFE2; }
 .fc-bir { background: var(--tint-good-2); }
 .fc-bog { background: var(--tint-bad-2); }
 .fc-dbl { background: var(--flag); color: #FDF6EC; }
-.frow:hover td.fc-eag, .frow.fsel td.fc-eag { background: var(--fairway); }
-.frow:hover td.fc-dbl, .frow.fsel td.fc-dbl { background: var(--flag); }
-.frow:hover td.fc-bir, .frow.fsel td.fc-bir { background: var(--tint-good-2); }
-.frow:hover td.fc-bog, .frow.fsel td.fc-bog { background: var(--tint-bad-2); }
+.frow:hover td.fc-eag { background: var(--fairway); }
+.frow:hover td.fc-dbl { background: var(--flag); }
+.frow:hover td.fc-bir { background: var(--tint-good-2); }
+.frow:hover td.fc-bog { background: var(--tint-bad-2); }
 .caphint .fkey { padding: 1px 7px; border-radius: 4px; font-size: 11px; }
 .caphint .fkey.fc-bir { color: var(--good); } .caphint .fkey.fc-bog { color: var(--bad); }
 
