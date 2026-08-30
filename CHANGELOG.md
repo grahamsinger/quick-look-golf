@@ -319,3 +319,7 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   being viewed (the main row already shows it — cell colors are its
   scores, Rd its total), and an expansion no longer follows the player
   into a different tournament's grid.
+- **Complete rounds join the stack**: once the expanded player's card for
+  the viewed round is signed (18 holes), it appears as a full raw-score
+  sub-row like the others — the skip only applies mid-round, when it
+  would duplicate the live main row.

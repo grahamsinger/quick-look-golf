@@ -137,13 +137,16 @@ export function renderField() {
 
   // inline scorecards for the expanded player: one sub-row per round —
   // raw hole scores colored by result, Rd = that round, Tot = through it.
-  // Newest first, and the viewed round is skipped: the player's main row
-  // already shows it (cell colors = its scores, Rd column = its total).
+  // Newest first. The viewed round joins the stack only once the player's
+  // card for it is complete — mid-round it would duplicate the live main
+  // row (whose cell colors are its scores, Rd column its running total).
   let expHtml = '';
   if (expandedPid && ordered.some(r => r.id === expandedPid)) {
+    const viewed = started.find(p => p.id === expandedPid);
+    const viewedDone = !!viewed && viewed.scores.length === 18;
     const parts = [];
     for (let r = maxRound(); r >= 1; r--) {
-      if (r === rnd) continue;
+      if (r === rnd && !viewedDone) continue;
       const rd = getField(tid, r);  // cached; a miss fetches and re-renders
       if (rd === null) {
         parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>
