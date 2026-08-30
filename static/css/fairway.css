@@ -425,6 +425,8 @@ table.fieldgrid .fname { position: sticky; left: 38px; z-index: 2; background: v
 table.fieldgrid thead .fpos, table.fieldgrid thead .fname { z-index: 4; }
 table.fieldgrid .frd { text-align: right; color: var(--ink-2); padding-left: 14px; }
 table.fieldgrid .frd b.rg-good { color: var(--good); } table.fieldgrid .frd b.rg-bad { color: var(--bad); }
+table.fieldgrid .ftot { text-align: right; }
+table.fieldgrid .ftot b.rg-good { color: var(--good); } table.fieldgrid .ftot b.rg-bad { color: var(--bad); }
 table.fieldgrid .fparrow td { color: var(--ink-3); font-size: 11px; border-bottom: 1.5px solid var(--line-2); }
 table.fieldgrid .fparrow .fname { font-weight: 700; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
 table.fieldgrid .fparrow td { position: sticky; top: 25px; z-index: 3; background: var(--card); }
@@ -450,6 +452,16 @@ table.fieldgrid .fparrow .fpos, table.fieldgrid .fparrow .fname { z-index: 4; }
 /* yet-to-start rows (live rounds): leaderboard-style row at the player's
    current standing — empty cells, tee time across the middle */
 .frow.fwait .fteecell { text-align: left; padding-left: 16px; color: var(--ink-3); font-size: 11.5px; }
+/* favorites: the star pins a player's row to the top of the grid */
+.fstar { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 14px;
+  padding: 0; margin-right: 3px; border: none; background: none; cursor: pointer;
+  color: var(--ink-3); opacity: 0; vertical-align: -2px; }
+.fstar svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
+.frow:hover .fstar, .fstar:focus-visible, .fstar.on { opacity: 1; }
+.fstar:hover { color: var(--sand); }
+.fstar.on { color: var(--sand); }
+.fstar.on svg { fill: var(--sand); }
+tr.favend td { border-bottom: 2px solid var(--line-2); }
 
 /* course overview: stats lead, the big aerial collapses behind a toggle */
 .cmhead { margin: 2px 2px 8px; }

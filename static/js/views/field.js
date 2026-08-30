@@ -38,6 +38,12 @@ function getField(tid, rnd) {
   return cur && cur.res ? cur.res : null;
 }
 
+// favorite players: their rows pin to the top of the grid. Stored once for
+// the app (player ids are stable), so favorites follow you across weeks.
+const FAV_LS = 'fairway-fav-players';
+function loadFavs() { try { return new Set(JSON.parse(localStorage.getItem(FAV_LS)) || []); } catch (e) { return new Set(); } }
+function saveFavs(s) { try { localStorage.setItem(FAV_LS, JSON.stringify([...s])); } catch (e) { /* private mode etc. */ } }
+
 const fmtPar = n => n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`;
 const cellCls = d => d <= -2 ? ' fc-eag' : d === -1 ? ' fc-bir' : d === 1 ? ' fc-bog' : d >= 2 ? ' fc-dbl' : '';
 // leaderboard total string ("-12" / "E" / "+3") -> number, unknowns sort last
@@ -95,48 +101,69 @@ export function renderField() {
     const rd = `${esc(strokes)} <b class="${toParCls}">${fmtPar(p.diff)}</b>`;
     return { id: p.id, cells, end: run, rd };
   }).concat(waiting.map(p => {
-    const tot = p.total || '';
-    const cls = tot.startsWith('-') ? 'rg-good' : tot.startsWith('+') ? 'rg-bad' : '';
     const tt = teeTimeStr(p.teeTime);
     const cells = `<td class="fcell fteecell" colspan="18">${tt ? `tees off ${esc(tt)}` : ''}</td>`;
-    return { id: p.id, cells, end: parseTot(tot), rd: `<b class="${cls}">${esc(fmtTotal(tot))}</b>`, wait: true };
+    return { id: p.id, cells, end: parseTot(p.total || ''), rd: '', wait: true };
   }));
   rows.sort((a, b) => a.end - b.end
     || (lbIdx.get(a.id) ?? 1e9) - (lbIdx.get(b.id) ?? 1e9));
-  // shared positions for ties on the current total
+  // shared positions for ties on the current total — computed before the
+  // favorites are pinned, so a pinned row keeps its real standing
   let pos = '';
-  const posOf = rows.map((r, i) => {
-    if (i && rows[i - 1].end === r.end) return pos;
-    const tied = rows.some((o, j) => j !== i && o.end === r.end);
-    pos = `${tied ? 'T' : ''}${i + 1}`;
-    return pos;
+  rows.forEach((r, i) => {
+    if (!(i && rows[i - 1].end === r.end)) {
+      const tied = rows.some((o, j) => j !== i && o.end === r.end);
+      pos = `${tied ? 'T' : ''}${i + 1}`;
+    }
+    r.pos = pos;
   });
+  const favs = loadFavs();
+  const pinned = rows.filter(r => favs.has(r.id));
+  const ordered = pinned.concat(rows.filter(r => !favs.has(r.id)));
 
   const parRow = d.available && !d.multiCourse && Object.keys(d.pars).length === 18
     ? `<tr class="fparrow"><td class="fpos"></td><td class="fname">Par</td>
         ${Array.from({ length: 18 }, (_, i) => `<td class="fcell">${d.pars[i + 1]}</td>`).join('')}
-        <td class="frd">${Object.values(d.pars).reduce((a, b) => a + b, 0)}</td></tr>`
+        <td class="frd">${Object.values(d.pars).reduce((a, b) => a + b, 0)}</td><td class="ftot"></td></tr>`
     : '';
 
-  const body = rows.map((r, i) =>
-    `<tr class="frow${r.wait ? ' fwait' : ''}${r.id === selId ? ' fsel' : ''}" data-pid="${esc(r.id)}">
-      <td class="fpos">${posOf[i]}</td><td class="fname">${esc(lbName.get(r.id) || r.id)}</td>${r.cells}
-      <td class="frd">${r.rd}</td></tr>`).join('');
+  const body = ordered.map((r, i) => {
+    const fav = favs.has(r.id);
+    const name = lbName.get(r.id) || r.id;
+    // rule under the last pinned row, separating favorites from the field
+    const favEnd = fav && i === pinned.length - 1 && ordered.length > pinned.length ? ' favend' : '';
+    const star = `<button type="button" class="fstar${fav ? ' on' : ''}" data-fav="${esc(r.id)}"
+      title="${fav ? 'Unpin from the top' : 'Pin to the top'}" aria-label="${fav ? 'Unpin' : 'Pin'} ${esc(name)}">
+      <svg viewBox="0 0 16 16"><path d="M8 1.9l1.85 3.75 4.15.6-3 2.93.7 4.12L8 11.35l-3.7 1.95.7-4.12-3-2.93 4.15-.6z"/></svg></button>`;
+    const totCls = r.end < 0 ? 'rg-good' : r.end > 0 ? 'rg-bad' : '';
+    const tot = Number.isFinite(r.end) ? fmtPar(r.end) : '';
+    return `<tr class="frow${r.wait ? ' fwait' : ''}${r.id === selId ? ' fsel' : ''}${favEnd}" data-pid="${esc(r.id)}">
+      <td class="fpos">${r.pos}</td><td class="fname">${star}${esc(name)}</td>${r.cells}
+      <td class="frd">${r.rd}</td><td class="ftot"><b class="${totCls}">${tot}</b></td></tr>`;
+  }).join('');
 
   const waitHint = waiting.length ? ' · yet-to-start rows show the tee time' : '';
   $('out').innerHTML =
     `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
      <div class="caphint">Each cell = cumulative <b>tournament</b> score to par through that hole · color = the score on that hole
        (<span class="fkey fc-eag">eagle+</span> <span class="fkey fc-bir">birdie</span> <span class="fkey fc-bog">bogey</span> <span class="fkey fc-dbl">double+</span>)
-       · click a row to select that player${waitHint}</div>
+       · click a row to select that player · ★ pins favorites to the top${waitHint}</div>
      <div class="card fieldcard"><div class="fieldwrap"><table class="fieldgrid">
        <thead><tr><th class="fpos"></th><th class="fname">Player</th>
          ${Array.from({ length: 18 }, (_, i) => `<th>${i + 1}</th>`).join('')}
-         <th class="frd">${d.available ? 'Rd' : 'Tot'}</th></tr>${parRow}</thead>
+         <th class="frd">Rd</th><th class="ftot">Tot</th></tr>${parRow}</thead>
        <tbody>${body}</tbody>
      </table></div></div>`;
 
   $('out').querySelector('tbody').addEventListener('click', (e) => {
+    const star = e.target.closest('.fstar');
+    if (star) {
+      const f = loadFavs();
+      f.has(star.dataset.fav) ? f.delete(star.dataset.fav) : f.add(star.dataset.fav);
+      saveFavs(f);
+      renderField();
+      return;  // toggling a star never changes the selected player
+    }
     const tr = e.target.closest('tr[data-pid]');
     if (tr && selectPlayer(tr.dataset.pid)) loadShots();  // re-renders + syncs URL
   });

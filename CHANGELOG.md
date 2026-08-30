@@ -294,3 +294,12 @@ collapses, lead changes — reads left to right.
 The overview now opens with the course-stats table; the big aerial sits
 below it behind a "Course map" toggle (open by default, the choice kept in
 localStorage). Hole-click zoom and the stats-row zoom both still work.
+- **Favorites**: a ★ on every Field row (visible on hover) pins that player
+  to the top of the grid, above a divider, keeping their real position.
+  Stored once per browser in localStorage (player ids are stable), so
+  favorites follow you from tournament to tournament. Toggling never
+  changes the selected player.
+- **Rd / Tot columns**: the right edge was one column meaning "round score"
+  for players on the course but "tournament total" for those yet to start.
+  Now two honest columns — Rd (strokes + round score once playing) and Tot
+  (cumulative tournament score for everyone, matching the last filled cell).
