@@ -75,8 +75,10 @@ default. Self-hosted Fraunces display serif.
   rows = players (ordered by where they stood when the round ended), columns =
   holes; each cell is the player's cumulative tournament score to par through
   that hole, colored by what they scored on it (eagle+/birdie/bogey/double+),
-  with a par row, round strokes, and tie-aware positions. Click a row to
-  select that player everywhere.
+  with a par row, Rd/Tot columns, and tie-aware positions. Click a row to
+  select that player everywhere; the ★ on a row (hover) **pins a favorite
+  to the top**, remembered across tournaments. During live play, players
+  yet to tee off hold their leaderboard spot with their tee time.
 - **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=&h=`), so a
   reload restores the view and a **copy-link** button shares it. A freshness bar
   shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp
