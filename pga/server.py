@@ -734,6 +734,116 @@ def coursestats(response: Response, tournamentId: str, refresh: bool = False) ->
     return out
 
 
+_HBH_Q = """
+query HBH($tid: ID!, $r: Int!) {
+  leaderboardHoleByHole(tournamentId: $tid, round: $r) {
+    currentRound
+    courseHoleHeaders { courseId holeHeaders { holeNumber par } }
+    courses { id courseName hostCourse }
+    playerData { playerId courseId out in total totalToPar scores { holeNumber par score } }
+  }
+}
+"""
+
+
+def _holebyhole_round(tid: str, rnd: int, refresh: bool = False) -> dict:
+    """Trimmed leaderboardHoleByHole for one round, cached.
+
+    Durable once the round is over: every player either has a full scorecard
+    or none (a partial card means live play — or an overnight suspension —
+    so those stay on the short TTL), or the tournament has moved past the
+    round. Field members who didn't play the round (missed cut, WD) are
+    dropped. `diff` = the player's round total relative to par, summed from
+    per-hole scores so multi-course weeks use each card's own pars.
+    """
+    key = f"golf:{CACHE_VERSION}:holebyhole:{tid}:{rnd}"
+    if refresh:
+        _cache_del(key)
+    else:
+        cached = _cache_get(key)
+        if cached is not None:
+            return json.loads(cached)
+    try:
+        data = client.query(_HBH_Q, {"tid": tid, "r": rnd}, "HBH").get("leaderboardHoleByHole")
+    except GraphQLError:
+        data = None
+    out: dict[str, Any] = {"available": False}
+    partial = False
+    if data:
+        # per-course hole pars (the header list interleaves OUT/IN/TOTAL
+        # columns — a "par" above 6 is one of those, not a hole)
+        pars: dict[str, dict[int, int]] = {}
+        for ch in data.get("courseHoleHeaders") or []:
+            m = {}
+            for h in ch.get("holeHeaders") or []:
+                try:
+                    p = int(h.get("par"))
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= (h.get("holeNumber") or 0) <= 18 and p <= 6:
+                    m[h["holeNumber"]] = p
+            pars[ch.get("courseId")] = m
+        courses = data.get("courses") or []
+        host = next((c.get("id") for c in courses if c.get("hostCourse")),
+                    courses[0].get("id") if courses else None)
+        players = []
+        for p in data.get("playerData") or []:
+            scores = []
+            diff = 0
+            for s in p.get("scores") or []:
+                sc = (s.get("score") or "").strip()
+                if not sc or sc == "-":
+                    continue
+                d = int(sc) - (s.get("par") or 0)
+                diff += d
+                scores.append({"h": s.get("holeNumber"), "par": s.get("par"), "s": int(sc)})
+            if not scores:
+                continue
+            if len(scores) < 18:
+                partial = True
+            players.append({
+                "id": p.get("playerId"),
+                "courseId": p.get("courseId"),
+                "scores": scores,
+                "diff": diff,
+                "out": p.get("out"),
+                "inn": p.get("in"),
+                "total": p.get("total"),
+                "toPar": p.get("totalToPar"),
+            })
+        out = {
+            "available": bool(players),
+            "round": rnd,
+            "currentRound": data.get("currentRound"),
+            "pars": pars.get(host) or {},
+            "multiCourse": len(courses) > 1,
+            "players": players,
+        }
+    final = out["available"] and ((out.get("currentRound") or 0) > rnd or not partial)
+    _cache_set(key, json.dumps(out), ttl=None if final else LIVE_TTL_S)
+    return out
+
+
+@app.get("/api/holebyhole")
+def holebyhole(response: Response, tournamentId: str, round: int, refresh: bool = False) -> dict:
+    """Full-field hole-by-hole scores for one round (the Field view).
+
+    Each player also gets `start`: their cumulative tournament score to par
+    entering the round (summed from the earlier rounds' cached scorecards),
+    so the client can draw the running-race chart — every cell the player's
+    tournament total through that hole.
+    """
+    data = dict(_holebyhole_round(tournamentId, round, refresh=refresh))
+    if data.get("available"):
+        starts: dict[str, int] = {}
+        for r in range(1, round):
+            prior = _holebyhole_round(tournamentId, r)
+            for p in prior.get("players") or []:
+                starts[p["id"]] = starts.get(p["id"], 0) + p["diff"]
+        data["players"] = [{**p, "start": starts.get(p["id"], 0)} for p in data["players"]]
+    return data
+
+
 @app.get("/graphiql", response_class=HTMLResponse)
 def graphiql() -> str:
     return (STATIC_DIR / "graphiql.html").read_text()

@@ -42,14 +42,15 @@ function playerMaxRound(mx) {
 }
 
 // Round options reflect data availability: only rounds the selected player
-// has played, plus "All rounds" — except in the per-round views: Shots, and
-// the Course overview (the Course *hole zoom* does offer All rounds — trails
-// from every round overlay on one hole).
+// has played, plus "All rounds" — except in the per-round views: Shots,
+// Field, and the Course overview (the Course *hole zoom* does offer All
+// rounds — trails from every round overlay on one hole).
 export function updateRoundOptions() {
   const sel = $('round');
   const cur = sel.value;
-  const mx = playerMaxRound(maxRound());
-  const allowAll = state.view !== 'shots' && !(state.view === 'course' && !state.courseHole);
+  const mx = state.view === 'field' ? maxRound() : playerMaxRound(maxRound());
+  const allowAll = state.view !== 'shots' && state.view !== 'field'
+    && !(state.view === 'course' && !state.courseHole);
   let html = '';
   for (let r = 1; r <= mx; r++) html += `<option value="${r}">Round ${r}</option>`;
   if (allowAll) html += '<option value="all">All rounds</option>';

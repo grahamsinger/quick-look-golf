@@ -92,7 +92,9 @@ export async function loadShots(opts = {}) {
         fetchRound('putts', tid, pid, useRound, force),
       ]);
       if (seq !== loadSeq) return;
-      if (!(pE.data.holes || []).some(scoredHole)) {
+      // (not in the Field view: the grid shows the whole tournament, and a
+      // missed-cut selected player must not yank the round picker around)
+      if (state.view !== 'field' && !(pE.data.holes || []).some(scoredHole)) {
         // no data for this player in the chosen round — drop to their last round with data
         const probe = [1, 2, 3, 4].filter(r => r <= maxRound());
         const all = await Promise.all(probe.map(r =>

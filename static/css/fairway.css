@@ -406,6 +406,45 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .holebar .hadj.on { background: var(--pine); color: #F4EFE2; border-color: var(--pine); }
 .holebar .hadjreset { color: var(--ink-3); }
 
+/* ---------- Field view (hole-by-hole running score, race chart) ---------- */
+/* no top padding: the sticky header must sit flush against the card edge,
+   or scrolled rows bleed into the padding band above it */
+.fieldcard { padding: 0 6px 6px; display: block; width: fit-content; max-width: 100%; }
+.fieldwrap { max-height: 78vh; overflow: auto; }
+table.fieldgrid thead tr:first-child th { height: 25px; box-sizing: border-box; }
+table.fieldgrid { border-collapse: separate; border-spacing: 0; }
+table.fieldgrid th, table.fieldgrid td { padding: 4px 7px; font-size: 12.5px; text-align: center;
+  font-variant-numeric: tabular-nums; white-space: nowrap; border-bottom: 1px solid var(--line); }
+table.fieldgrid thead th { position: sticky; top: 0; z-index: 3; background: var(--card);
+  color: var(--ink-3); font-weight: 700; font-size: 10px; letter-spacing: .06em;
+  border-bottom: 1.5px solid var(--line-2); }
+table.fieldgrid .fpos { position: sticky; left: 0; z-index: 2; background: var(--card);
+  min-width: 30px; color: var(--ink-3); font-size: 11px; text-align: right; }
+table.fieldgrid .fname { position: sticky; left: 38px; z-index: 2; background: var(--card);
+  text-align: left; font-weight: 560; padding-right: 14px; }
+table.fieldgrid thead .fpos, table.fieldgrid thead .fname { z-index: 4; }
+table.fieldgrid .frd { text-align: right; color: var(--ink-2); padding-left: 14px; }
+table.fieldgrid .frd b.rg-good { color: var(--good); } table.fieldgrid .frd b.rg-bad { color: var(--bad); }
+table.fieldgrid .fparrow td { color: var(--ink-3); font-size: 11px; border-bottom: 1.5px solid var(--line-2); }
+table.fieldgrid .fparrow .fname { font-weight: 700; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+table.fieldgrid .fparrow td { position: sticky; top: 25px; z-index: 3; background: var(--card); }
+table.fieldgrid .fparrow .fpos, table.fieldgrid .fparrow .fname { z-index: 4; }
+.frow { cursor: pointer; }
+.frow:hover td { background: var(--card-2); }
+.frow.fsel td { background: var(--turf); }
+.frow.fsel .fname { font-weight: 700; color: var(--pine); }
+/* cell fill = the score on that hole (the number is the running total) */
+.fc-eag { background: var(--fairway); color: #F4EFE2; }
+.fc-bir { background: var(--tint-good-2); }
+.fc-bog { background: var(--tint-bad-2); }
+.fc-dbl { background: var(--flag); color: #FDF6EC; }
+.frow:hover td.fc-eag, .frow.fsel td.fc-eag { background: var(--fairway); }
+.frow:hover td.fc-dbl, .frow.fsel td.fc-dbl { background: var(--flag); }
+.frow:hover td.fc-bir, .frow.fsel td.fc-bir { background: var(--tint-good-2); }
+.frow:hover td.fc-bog, .frow.fsel td.fc-bog { background: var(--tint-bad-2); }
+.caphint .fkey { padding: 1px 7px; border-radius: 4px; font-size: 11px; }
+.caphint .fkey.fc-bir { color: var(--good); } .caphint .fkey.fc-bog { color: var(--bad); }
+
 /* ---------- course stats (how the field played each hole) ---------- */
 .statscard { padding: 4px 16px 4px; }
 .statsbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 2px 8px; }

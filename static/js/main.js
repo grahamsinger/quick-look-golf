@@ -18,10 +18,10 @@ document.querySelectorAll('.segbtn').forEach(btn => btn.addEventListener('click'
   const wasAll = $('round').value === 'all';
   setActiveView(view);
   updateRoundOptions();  // Shots + Course overview drop the "All rounds" option
-  // Shots and the Course overview are per-round; the Course hole zoom keeps
-  // "All rounds". If "All rounds" was selected and the target view can't show
-  // it, switch to the latest played round and load it.
-  if ((view === 'shots' || (view === 'course' && !state.courseHole)) && wasAll) {
+  // Shots, Field, and the Course overview are per-round; the Course hole zoom
+  // keeps "All rounds". If "All rounds" was selected and the target view can't
+  // show it, switch to the latest played round and load it.
+  if ((view === 'shots' || view === 'field' || (view === 'course' && !state.courseHole)) && wasAll) {
     const scored = h => h && h.score != null && h.score !== '' && h.score !== '-';
     const latest = state.puttsAll
       ? [4, 3, 2, 1].find(r => state.puttsAll[r] && (state.puttsAll[r].holes || []).some(scored))
@@ -54,6 +54,7 @@ async function init() {
   const q = new URLSearchParams(location.search);
   const wantT = q.get('t'), wantP = q.get('p'), wantR = q.get('r'), wantV = q.get('v'), wantH = q.get('h');
   if (wantV === 'shots' || wantV === 'trails') setActiveView('shots');
+  else if (wantV === 'field') setActiveView('field');
   else if (wantV === 'course') {
     setActiveView('course');
     const h = Number(wantH);

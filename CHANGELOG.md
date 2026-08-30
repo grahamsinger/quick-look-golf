@@ -255,3 +255,28 @@ query (the site's Course Stats tab — new `/api/coursestats` proxy):
   shortfall is triples+. Derived per round (cuts handled — each round
   carries its own field size), All Rounds sums the rounds; blank ("–") for
   a live round, where unreached holes would masquerade as others.
+
+## Aug 2026 — Field view (hole-by-hole running score)
+
+A fourth view: the whole field's round as the classic race chart (rows =
+players, columns = holes 1–18). Each cell is the player's **cumulative
+tournament score to par through that hole**, colored by what they scored ON
+the hole (eagle+ / birdie / bogey / double+), so the round's story — charges,
+collapses, lead changes — reads left to right.
+
+- Data: new `/api/holebyhole` over `leaderboardHoleByHole(tournamentId,
+  round)` — every player's numeric per-hole score in one query (found while
+  verifying the course stats). The server adds each player's cumulative
+  to-par *entering* the round, summed per-hole from the earlier rounds'
+  cached scorecards (multi-course weeks use each card's own pars).
+- Rows ordered by standing at the end of that round, tie-aware positions,
+  par row + sticky header/name columns, round strokes + to-par at the right;
+  the selected player's row is highlighted and clicking a row selects that
+  player app-wide. Field members who didn't play the round are dropped.
+- Caching: a round is durable once every scorecard is complete (or the
+  tournament has moved past it); partial cards — live play or an overnight
+  suspension — keep the 30 s TTL, and the client re-fetches a live payload
+  every 30 s while showing the previous snapshot.
+- The Field view is per-round ("All rounds" leaves the picker, like Shots);
+  its round options cover the tournament, not the selected player, and the
+  no-data player fallback no longer yanks the round picker while in it.

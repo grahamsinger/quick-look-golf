@@ -70,6 +70,12 @@ default. Self-hosted Fraunces display serif.
     **All Rounds** or any single round (per-round yardage shows moved-up
     tees). Click a row to zoom the hole; the hole zoom shows the same numbers
     for the open hole in a **field strip** that follows the round selection.
+- **Field** view: the whole field's round as the classic **race chart** —
+  rows = players (ordered by where they stood when the round ended), columns =
+  holes; each cell is the player's cumulative tournament score to par through
+  that hole, colored by what they scored on it (eagle+/birdie/bogey/double+),
+  with a par row, round strokes, and tie-aware positions. Click a row to
+  select that player everywhere.
 - **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=&h=`), so a
   reload restores the view and a **copy-link** button shares it. A freshness bar
   shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp
