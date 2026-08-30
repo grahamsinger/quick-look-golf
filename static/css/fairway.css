@@ -447,6 +447,22 @@ table.fieldgrid .fparrow .fpos, table.fieldgrid .fparrow .fname { z-index: 4; }
 .frow:hover td.fc-bog { background: var(--tint-bad-2); }
 .caphint .fkey { padding: 1px 7px; border-radius: 4px; font-size: 11px; }
 .caphint .fkey.fc-bir { color: var(--good); } .caphint .fkey.fc-bog { color: var(--bad); }
+/* yet-to-tee-off (live rounds): field members the grid can't show yet */
+.teewait { margin: 2px 2px 18px; }
+.teewait-hdr { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 12.5px;
+  font-weight: 640; color: var(--ink-2); background: none; border: none; cursor: pointer; padding: 4px 2px; }
+.teewait-hdr:hover { color: var(--pine); }
+.teewait-hdr .twcaret { transition: transform .15s; color: var(--ink-3); }
+.teewait-hdr[aria-expanded="false"] .twcaret { transform: rotate(-90deg); }
+.teewait-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; max-width: 980px; }
+.teechip { display: inline-flex; align-items: baseline; gap: 7px; font: inherit; font-size: 12.5px;
+  padding: 5px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--card);
+  color: var(--ink); cursor: pointer; }
+.teechip:hover { border-color: var(--pine); }
+.teechip.sel { border-color: var(--pine); background: var(--turf); }
+.teechip .tpos { color: var(--ink-3); font-size: 11px; }
+.teechip b.rg-good { color: var(--good); } .teechip b.rg-bad { color: var(--bad); }
+.teechip .ttime { color: var(--ink-3); font-size: 11px; }
 
 /* ---------- course stats (how the field played each hole) ---------- */
 .statscard { padding: 4px 16px 4px; }
