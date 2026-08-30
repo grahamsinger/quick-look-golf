@@ -262,6 +262,21 @@ function wireStatsCard() {
 
 // --- full-course view ------------------------------------------------------
 
+// The overview leads with the stats table; the big aerial below it can be
+// collapsed, and the choice sticks (localStorage) across visits.
+const MAP_LS = 'fairway-course-map';
+let mapOpenState = null;
+function mapOpen() {
+  if (mapOpenState === null) {
+    try { mapOpenState = localStorage.getItem(MAP_LS) !== '0'; } catch (e) { mapOpenState = true; }
+  }
+  return mapOpenState;
+}
+function setMapOpen(v) {
+  mapOpenState = v;
+  try { localStorage.setItem(MAP_LS, v ? '1' : '0'); } catch (e) { /* private mode etc. */ }
+}
+
 function renderFullCourse(cm) {
   const tid = $('tourn').value;
   const d = state.shots;
@@ -285,18 +300,26 @@ function renderFullCourse(cm) {
     return `<g class="chole" data-hole="${g.h.holeNumber}">${trailSvg(g.pts)}${label}</g>`;
   };
 
+  const mapBlock = mapOpen()
+    ? `<div class="caphint">Trails run tee → hole · click a hole to zoom in · hover a dot for the shot · hole chip = score (<b class="rg-good">under</b> / par / <b class="rg-bad">over</b>) · aerial: PGA TOUR TOURCAST</div>
+       <div class="card coursemap"><div class="cmwrap">
+         <img src="${esc(cm.imageUrl)}" alt="Course aerial" draggable="false" />
+         <svg viewBox="0 0 2048 2048" role="img" aria-label="Shot trails over the course aerial">${groups.map(trail).join('')}</svg>
+       </div></div>`
+    : '';
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b> · every shot on the course</span></div>
-     <div class="caphint">Trails run tee → hole · click a hole to zoom in · hover a dot for the shot · hole chip = score (<b class="rg-good">under</b> / par / <b class="rg-bad">over</b>) · aerial: PGA TOUR TOURCAST</div>
-     <div class="card coursemap"><div class="cmwrap">
-       <img src="${esc(cm.imageUrl)}" alt="Course aerial" draggable="false" />
-       <svg viewBox="0 0 2048 2048" role="img" aria-label="Shot trails over the course aerial">${groups.map(trail).join('')}</svg>
-     </div></div>
-     ${courseStatsCard(getCourseStats(tid))}`;
-  $('out').querySelector('.cmwrap svg').addEventListener('click', (e) => {
+     ${courseStatsCard(getCourseStats(tid))}
+     <div class="cmhead"><button type="button" class="cmtoggle" aria-expanded="${mapOpen()}">
+       <svg class="cmcaret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5 8 10.5 12 6.5"/></svg>
+       Course map</button></div>
+     ${mapBlock}`;
+  const mapSvg = $('out').querySelector('.cmwrap svg');
+  if (mapSvg) mapSvg.addEventListener('click', (e) => {
     const g = e.target.closest('.chole');
     if (g && g.dataset.hole) zoomToHole(Number(g.dataset.hole));
   });
+  $('out').querySelector('.cmtoggle').addEventListener('click', () => { setMapOpen(!mapOpen()); renderCourse(); });
   wireStatsCard();
 }
 

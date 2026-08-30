@@ -63,7 +63,8 @@ default. Self-hosted Fraunces display serif.
   color-coded (tee-shot dispersion at a glance). Available for
   ShotLink-enhanced events (most of the schedule); smaller opposite-field
   events don't publish the imagery and fall back gracefully.
-  - **Course stats for the week** under the aerial: per hole — par, yards,
+  - **Course stats for the week** lead the view (the aerial sits below them,
+    collapsible, the choice remembered): per hole — par, yards,
     scoring average, to-par diff, difficulty rank, and
     eagle/birdie/par/bogey/double counts plus a derived **T+ "others"** column
     (triples or worse), with OUT/IN/TOTAL rows and pills for

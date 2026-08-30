@@ -288,3 +288,9 @@ collapses, lead changes — reads left to right.
   starts the view is the whole tee sheet in standings order. Mid-round rows
   show just their running to-par in the Rd column (strokes are "-" until
   the card is signed).
+
+## Aug 2026 — Course overview: stats lead, the aerial collapses
+
+The overview now opens with the course-stats table; the big aerial sits
+below it behind a "Course map" toggle (open by default, the choice kept in
+localStorage). Hole-click zoom and the stats-row zoom both still work.
