@@ -323,3 +323,8 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   the viewed round is signed (18 holes), it appears as a full raw-score
   sub-row like the others — the skip only applies mid-round, when it
   would duplicate the live main row.
+- **One scroller**: the grid no longer scrolls inside a scrolling page —
+  on wide screens it runs full length, the page is the only scrollbar,
+  and the header + par rows stick just under the topbar (offsets overlap
+  2px: fractional-pixel seams between stacked sticky rows bleed).
+  Narrow screens keep the contained scroll for its horizontal axis.
