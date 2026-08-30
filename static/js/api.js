@@ -61,10 +61,15 @@ let loadSeq = 0;
 
 export async function loadShots(opts = {}) {
   const force = !!opts.force;
+  // background: fetch the player's round data without tearing down the view
+  // (the Field grid renders from its own cache — clicking a row there must
+  // not blank the leaderboard while the player's shots load)
+  const background = !!opts.background;
   const tid = $('tourn').value, pid = $('player').value, rnd = $('round').value;
   if (!tid || !pid) { status('Pick a tournament and player first.', true); return; }
   const seq = ++loadSeq;
-  $('go').disabled = true; status(force ? 'Refreshing…' : 'Loading…'); $('out').innerHTML = '';
+  $('go').disabled = true;
+  if (!background) { status(force ? 'Refreshing…' : 'Loading…'); $('out').innerHTML = ''; }
   const t0 = performance.now();
   const setLoadMeta = (sources) => {
     state.loadMs = Math.round(performance.now() - t0);

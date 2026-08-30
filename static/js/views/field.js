@@ -141,7 +141,7 @@ export function renderField() {
       const rd = getField(tid, r);  // cached; a miss fetches and re-renders
       if (rd === null) {
         parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>
-          <td class="fcell fteecell" colspan="18">loading…</td><td class="frd"></td><td class="ftot"></td></tr>`);
+          <td class="fcell fteecell" colspan="18"><span class="fspin"></span>loading…</td><td class="frd"></td><td class="ftot"></td></tr>`);
         continue;
       }
       const p = rd.available && rd.players.find(x => x.id === expandedPid);
@@ -180,6 +180,10 @@ export function renderField() {
   }).join('');
 
   const waitHint = waiting.length ? ' · yet-to-start rows show the tee time' : '';
+  // re-renders (expansion toggles, live refreshes) must not lose the
+  // reader's place in the grid's own scroll container
+  const prevWrap = $('out').querySelector('.fieldwrap');
+  const keepScroll = prevWrap ? prevWrap.scrollTop : 0;
   $('out').innerHTML =
     `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
      <div class="caphint">Each cell = cumulative <b>tournament</b> score to par through that hole · color = the score on that hole
@@ -191,6 +195,9 @@ export function renderField() {
          <th class="frd">Rd</th><th class="ftot">Tot</th></tr>${parRow}</thead>
        <tbody>${body}</tbody>
      </table></div></div>`;
+
+  const newWrap = $('out').querySelector('.fieldwrap');
+  if (newWrap && keepScroll) newWrap.scrollTop = keepScroll;
 
   $('out').querySelector('tbody').addEventListener('click', (e) => {
     const star = e.target.closest('.fstar');
@@ -204,7 +211,8 @@ export function renderField() {
     const tr = e.target.closest('tr[data-pid]');
     if (!tr) return;
     expandedPid = expandedPid === tr.dataset.pid ? null : tr.dataset.pid;
-    if (selectPlayer(tr.dataset.pid)) loadShots();  // re-renders + syncs URL
-    else renderField();
+    const known = selectPlayer(tr.dataset.pid);
+    renderField();  // instant: the expansion opens from cache, spinners cover the rest
+    if (known) loadShots({ background: true });  // player data for the other views
   });
 }

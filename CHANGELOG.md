@@ -308,3 +308,10 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   with Rd (that round) and Tot (cumulative through it) in the end columns.
   Clicking again collapses; the click still selects the player app-wide.
   Rounds come from the same cached per-round payloads, so it's free.
+- **No more page-blank on row click**: selecting a player from the grid
+  used to tear the view down while their shot data loaded (and the page
+  collapse threw the scroll back to the top). The expansion now opens
+  instantly from the field's own cache — spinner sub-rows cover rounds
+  still fetching — while the player's shots load in the background
+  (`loadShots({background})` keeps the view up), and re-renders restore
+  the grid's scroll position (live refreshes stop jumping too).
