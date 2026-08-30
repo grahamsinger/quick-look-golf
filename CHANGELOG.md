@@ -315,3 +315,7 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   still fetching — while the player's shots load in the background
   (`loadShots({background})` keeps the view up), and re-renders restore
   the grid's scroll position (live refreshes stop jumping too).
+- **Expansion polish**: sub-rows run newest round first and skip the round
+  being viewed (the main row already shows it — cell colors are its
+  scores, Rd its total), and an expansion no longer follows the player
+  into a different tournament's grid.

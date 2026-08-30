@@ -45,8 +45,10 @@ function loadFavs() { try { return new Set(JSON.parse(localStorage.getItem(FAV_L
 function saveFavs(s) { try { localStorage.setItem(FAV_LS, JSON.stringify([...s])); } catch (e) { /* private mode etc. */ } }
 
 // clicking a row opens that player's round-by-round scorecards inline
-// (and selects them app-wide); clicking again closes it
-let expandedPid = null;
+// (and selects them app-wide); clicking again closes it. Scoped to the
+// tournament — player ids are stable, so without the reset an expansion
+// would follow the player into the next tournament's grid.
+let expandedPid = null, expandedTid = null;
 
 const fmtPar = n => n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`;
 const cellCls = d => d <= -2 ? ' fc-eag' : d === -1 ? ' fc-bir' : d === 1 ? ' fc-bog' : d >= 2 ? ' fc-dbl' : '';
@@ -63,6 +65,7 @@ export function renderField() {
   const tid = $('tourn').value;
   const rnd = Number($('round').value);
   if (!tid || !rnd) { $('out').innerHTML = ''; return; }
+  if (expandedTid !== tid) { expandedTid = tid; expandedPid = null; }
   const d = getField(tid, rnd);
   if (d === null) { $('out').innerHTML = '<div class="summary"><span class="meta">Loading the field…</span></div>'; return; }
 
@@ -133,11 +136,14 @@ export function renderField() {
     : '';
 
   // inline scorecards for the expanded player: one sub-row per round —
-  // raw hole scores colored by result, Rd = that round, Tot = through it
+  // raw hole scores colored by result, Rd = that round, Tot = through it.
+  // Newest first, and the viewed round is skipped: the player's main row
+  // already shows it (cell colors = its scores, Rd column = its total).
   let expHtml = '';
   if (expandedPid && ordered.some(r => r.id === expandedPid)) {
     const parts = [];
-    for (let r = 1; r <= maxRound(); r++) {
+    for (let r = maxRound(); r >= 1; r--) {
+      if (r === rnd) continue;
       const rd = getField(tid, r);  // cached; a miss fetches and re-renders
       if (rd === null) {
         parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>
