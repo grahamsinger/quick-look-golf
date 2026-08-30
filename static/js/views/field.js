@@ -9,7 +9,7 @@ import { $, esc } from '../dom.js';
 import { state, maxRound } from '../state.js';
 import { api, loadShots } from '../api.js';
 import { isOutPos, fmtTotal } from '../format.js';
-import { selectPlayer } from '../pickers/player.js';
+import { selectPlayer, refreshPlayersIfStale } from '../pickers/player.js';
 
 // "tid:round" -> {res, ts, live, pending}. A finished round's payload is kept
 // for the session; a live one (partial scorecards, or nothing yet) re-fetches
@@ -22,6 +22,7 @@ function getField(tid, rnd) {
   const e = fieldCache.get(key);
   const stale = e && e.res && e.live && !e.pending && Date.now() - e.ts > 30000;
   if (e === undefined || stale) {
+    if (stale) refreshPlayersIfStale();  // live: leaderboard ages on the same clock
     fieldCache.set(key, { ...(e || {}), pending: true });
     api(`/api/holebyhole?tournamentId=${encodeURIComponent(tid)}&round=${rnd}`)
       .then(res => {
@@ -50,6 +51,17 @@ function saveFavs(s) { try { localStorage.setItem(FAV_LS, JSON.stringify([...s])
 // would follow the player into the next tournament's grid.
 let expandedPid = null, expandedTid = null;
 
+// A live round keeps itself fresh: while the Field view shows a live
+// payload, a timer re-renders ~every 30 s, which makes getField notice the
+// stale entry and re-fetch (leaderboard alongside). Idle pages update too —
+// staleness checks alone only ran when something else caused a render.
+let liveTimer = null;
+function scheduleLiveRefresh(live) {
+  clearTimeout(liveTimer);
+  if (!live) return;
+  liveTimer = setTimeout(() => { if (state.view === 'field') renderField(); }, 31000);
+}
+
 const fmtPar = n => n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`;
 const cellCls = d => d <= -2 ? ' fc-eag' : d === -1 ? ' fc-bir' : d === 1 ? ' fc-bog' : d >= 2 ? ' fc-dbl' : '';
 const sgnCls = n => n < 0 ? 'rg-good' : n > 0 ? 'rg-bad' : '';
@@ -67,6 +79,8 @@ export function renderField() {
   if (!tid || !rnd) { $('out').innerHTML = ''; return; }
   if (expandedTid !== tid) { expandedTid = tid; expandedPid = null; }
   const d = getField(tid, rnd);
+  const entry = fieldCache.get(`${tid}:${rnd}`);
+  scheduleLiveRefresh(entry && entry.live);
   if (d === null) { $('out').innerHTML = '<div class="summary"><span class="meta">Loading the field…</span></div>'; return; }
 
   const lb = state.players || [];

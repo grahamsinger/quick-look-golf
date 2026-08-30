@@ -22,13 +22,20 @@ export function selectPlayer(id) {
   return false;
 }
 
-export async function loadPlayers() {
+let playersTs = 0;  // when the leaderboard snapshot was captured
+
+export async function loadPlayers(opts = {}) {
+  // quiet: a live-play refresh — keep the current selection, no status
+  // churn, and repaint whatever is showing leaderboard data right now
+  const quiet = !!opts.quiet;
   const tid = $('tourn').value;
   if (!tid) return;
-  status('Loading field…');
-  const sel = $('player'); sel.innerHTML = '<option>loading…</option>';
+  const sel = $('player');
+  const keep = quiet ? sel.value : '';
+  if (!quiet) { status('Loading field…'); sel.innerHTML = '<option>loading…</option>'; }
   try {
     const data = await api(`/api/leaderboard?tournamentId=${encodeURIComponent(tid)}`);
+    if ($('tourn').value !== tid) return;  // tournament switched mid-flight
     state.players = data.players;
     sel.innerHTML = '';
     data.players.forEach(p => {
@@ -37,13 +44,30 @@ export async function loadPlayers() {
       o.textContent = `${p.position ? p.position + '  ' : ''}${p.name}${p.total ? '  (' + p.total + ')' : ''}`;
       sel.appendChild(o);
     });
+    if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
     // remember the tournament's latest round with data (drives the round
     // picker's options; First putts stays on "All rounds").
     state.currentRound = data.currentRound || null;
+    playersTs = Date.now();
     updateRoundOptions();
     syncPlayerBtn();
-    status(`${data.players.length} players in the field.`);
-  } catch (e) { state.players = []; sel.innerHTML = '<option value="">—</option>'; syncPlayerBtn(); status('Field failed: ' + e.message, true); }
+    if (!quiet) status(`${data.players.length} players in the field.`);
+    else if (!$('playerPanel').hidden) renderPlayerBoard($('playerFilter').value);
+  } catch (e) {
+    if (quiet) return;  // keep the stale snapshot rather than blanking the picker
+    state.players = []; sel.innerHTML = '<option value="">—</option>'; syncPlayerBtn(); status('Field failed: ' + e.message, true);
+  }
+}
+
+// During live play the leaderboard snapshot ages fast ("thru 11" long after
+// the player finished). Called when the picker opens and on the Field view's
+// live cycle: re-fetches at most every 30 s, only for in-progress events.
+export function refreshPlayersIfStale() {
+  const t = state.tournaments.find(x => x.id === $('tourn').value);
+  if (!t || t.tournamentStatus !== 'IN_PROGRESS') return;
+  if (Date.now() - playersTs < 30000) return;
+  playersTs = Date.now();  // debounce overlapping calls
+  loadPlayers({ quiet: true });
 }
 
 function renderPlayerBoard(filter) {
@@ -91,6 +115,7 @@ function setActivePlayer(i) {
   items[playerActive].scrollIntoView({ block: 'nearest' });
 }
 function openPlayerPanel() {
+  refreshPlayersIfStale();  // live event: the board repaints when it lands
   $('playerFilter').value = '';
   renderPlayerBoard('');
   $('playerPanel').hidden = false;

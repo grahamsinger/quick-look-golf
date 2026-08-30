@@ -328,3 +328,11 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   and the header + par rows stick just under the topbar (offsets overlap
   2px: fractional-pixel seams between stacked sticky rows bleed).
   Narrow screens keep the contained scroll for its horizontal axis.
+- **Live data actually stays live**: the leaderboard snapshot behind the
+  player picker was fetched once per tournament, so its "thru N" aged all
+  day; and the grid's 30 s staleness check only ran when something else
+  triggered a render — an idle page never updated. Now a live Field view
+  runs a real ~30 s cycle (holebyhole + a quiet leaderboard refresh that
+  keeps the selection and repaints an open picker), and opening the player
+  picker on a live event refreshes the board too (30 s debounce,
+  in-progress tournaments only).
