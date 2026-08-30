@@ -280,10 +280,11 @@ collapses, lead changes — reads left to right.
 - The Field view is per-round ("All rounds" leaves the picker, like Shots);
   its round options cover the tournament, not the selected player, and the
   no-data player fallback no longer yanks the round picker while in it.
-- **"Yet to tee off"** (live rounds): field members with no scores in the
-  round yet — dropped from the grid — appear under it as chips (position ·
-  name · tournament score · tee time, ordered by tee time), collapsible and
-  open by default (the choice survives live re-renders). Cut/WD players are
-  excluded; before a round starts the section carries the whole tee sheet.
-  Mid-round rows show just their running to-par in the Rd column (strokes
-  are "-" until the card is signed).
+- **Live rounds read like a real leaderboard**: field members who haven't
+  teed off get normal rows *in* the grid at their current standing — empty
+  cells with "tees off ‹time›" across the middle and their tournament total
+  in the last column — interleaved with the players on the course (everyone
+  sorts by current total). Cut/WD players are excluded; before a round
+  starts the view is the whole tee sheet in standings order. Mid-round rows
+  show just their running to-par in the Rd column (strokes are "-" until
+  the card is signed).

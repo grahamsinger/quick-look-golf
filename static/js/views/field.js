@@ -1,8 +1,10 @@
 // Field view: the whole field's hole-by-hole running score for one round —
 // the classic race chart. Each cell is the player's cumulative TOURNAMENT
 // score to par through that hole; the cell's color is what they scored ON
-// the hole (eagle+ / birdie / bogey / double+). Rows are ordered by where
-// each player stood when the round ended.
+// the hole (eagle+ / birdie / bogey / double+). Rows are ordered by current
+// standing, so during live play this reads like a normal leaderboard —
+// players yet to tee off sit at their position with an empty row showing
+// their tee time.
 import { $, esc } from '../dom.js';
 import { state } from '../state.js';
 import { api, loadShots } from '../api.js';
@@ -38,38 +40,13 @@ function getField(tid, rnd) {
 
 const fmtPar = n => n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`;
 const cellCls = d => d <= -2 ? ' fc-eag' : d === -1 ? ' fc-bir' : d === 1 ? ' fc-bog' : d >= 2 ? ' fc-dbl' : '';
-
-// "Yet to tee off" section (live rounds): field members the grid can't show
-// yet, with tournament score + tee time. Collapsible; open by default, and
-// the choice survives the 30 s live re-renders.
-let teeOpen = true;
-
-function teeWaitHtml(waiting, selId) {
-  if (!waiting.length) return '';
-  const chips = waiting.map(p => {
-    const tot = p.total || '';
-    const cls = tot.startsWith('-') ? 'rg-good' : tot.startsWith('+') ? 'rg-bad' : '';
-    const tt = p.teeTime ? new Date(p.teeTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-    return `<button type="button" class="teechip${p.id === selId ? ' sel' : ''}" data-pid="${esc(p.id)}">
-      <span class="tpos">${esc(p.position || '')}</span>${esc(p.name)}
-      <b class="${cls}">${esc(fmtTotal(tot))}</b>${tt ? `<span class="ttime">${esc(tt)}</span>` : ''}</button>`;
-  }).join('');
-  return `<div class="teewait">
-    <button type="button" class="teewait-hdr" aria-expanded="${teeOpen}">
-      <svg class="ic twcaret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5 8 10.5 12 6.5"/></svg>
-      Yet to tee off · <b>${waiting.length}</b>
-    </button>
-    ${teeOpen ? `<div class="teewait-list">${chips}</div>` : ''}
-  </div>`;
-}
-
-function wireTeeWait() {
-  const tw = $('out').querySelector('.teewait');
-  if (!tw) return;
-  tw.querySelector('.teewait-hdr').addEventListener('click', () => { teeOpen = !teeOpen; renderField(); });
-  tw.querySelectorAll('.teechip').forEach(b =>
-    b.addEventListener('click', () => { if (selectPlayer(b.dataset.pid)) loadShots(); }));
-}
+// leaderboard total string ("-12" / "E" / "+3") -> number, unknowns sort last
+const parseTot = t => t === 'E' ? 0 : Number.isFinite(Number(t)) && t !== '' ? Number(t) : Infinity;
+const teeTimeStr = ms => {
+  if (!ms) return '';
+  const d = new Date(Number(ms));
+  return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
 
 export function renderField() {
   const tid = $('tourn').value;
@@ -83,28 +60,26 @@ export function renderField() {
   const lbName = new Map(lb.map(p => [p.id, p.name]));
   const selId = $('player').value;
 
-  // field members with no scores in this round: mid-week that's the
-  // yet-to-tee-off group (cut/WD players are excluded); on a completed
-  // tournament everyone eligible has played and this is empty
+  // field members with no scores in this round yet — mid-week that's the
+  // yet-to-tee-off group (cut/WD excluded); they get leaderboard-style rows
+  // at their current standing, empty cells, tee time across the middle. On
+  // a completed tournament everyone eligible has played and this is empty.
   const tourn = state.tournaments.find(x => x.id === tid);
   const inProgress = tourn && tourn.tournamentStatus !== 'COMPLETED';
-  const inGrid = new Set(d.available ? d.players.map(p => p.id) : []);
+  const started = d.available ? d.players : [];
+  const inGrid = new Set(started.map(p => p.id));
   const waiting = (d.available || inProgress)
     ? lb.filter(p => !inGrid.has(p.id) && !isOutPos(p.position))
-        .sort((a, b) => (a.teeTime || Infinity) - (b.teeTime || Infinity))
     : [];
 
-  if (!d.available) {
-    $('out').innerHTML =
-      `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
-       <div class="summary"><span class="meta">No hole-by-hole scores for this round yet${waiting.length ? ' — tee times below' : ''}.</span></div>
-       ${teeWaitHtml(waiting, selId)}`;
-    wireTeeWait();
+  if (!started.length && !waiting.length) {
+    $('out').innerHTML = '<div class="summary"><span class="meta">No hole-by-hole scores for this round yet.</span></div>';
     return;
   }
 
-  // running totals per row, ordered by standing at the end of the round
-  const rows = d.players.map(p => {
+  // one row per player, ordered by current standing (running total for
+  // players on the course, leaderboard total for those yet to start)
+  const rows = started.map(p => {
     const by = new Map(p.scores.map(s => [s.h, s]));
     let run = p.start;
     let cells = '';
@@ -115,11 +90,20 @@ export function renderField() {
       run += diff;
       cells += `<td class="fcell${cellCls(diff)}">${fmtPar(run)}</td>`;
     }
-    return { p, cells, end: run };
-  });
+    const toParCls = p.diff < 0 ? 'rg-good' : p.diff > 0 ? 'rg-bad' : '';
+    const strokes = p.total && p.total !== '-' ? p.total : '';  // "-" until the round is done
+    const rd = `${esc(strokes)} <b class="${toParCls}">${fmtPar(p.diff)}</b>`;
+    return { id: p.id, cells, end: run, rd };
+  }).concat(waiting.map(p => {
+    const tot = p.total || '';
+    const cls = tot.startsWith('-') ? 'rg-good' : tot.startsWith('+') ? 'rg-bad' : '';
+    const tt = teeTimeStr(p.teeTime);
+    const cells = `<td class="fcell fteecell" colspan="18">${tt ? `tees off ${esc(tt)}` : ''}</td>`;
+    return { id: p.id, cells, end: parseTot(tot), rd: `<b class="${cls}">${esc(fmtTotal(tot))}</b>`, wait: true };
+  }));
   rows.sort((a, b) => a.end - b.end
-    || (lbIdx.get(a.p.id) ?? 1e9) - (lbIdx.get(b.p.id) ?? 1e9));
-  // shared positions for ties on the running total
+    || (lbIdx.get(a.id) ?? 1e9) - (lbIdx.get(b.id) ?? 1e9));
+  // shared positions for ties on the current total
   let pos = '';
   const posOf = rows.map((r, i) => {
     if (i && rows[i - 1].end === r.end) return pos;
@@ -128,37 +112,32 @@ export function renderField() {
     return pos;
   });
 
-  const parRow = !d.multiCourse && Object.keys(d.pars).length === 18
+  const parRow = d.available && !d.multiCourse && Object.keys(d.pars).length === 18
     ? `<tr class="fparrow"><td class="fpos"></td><td class="fname">Par</td>
         ${Array.from({ length: 18 }, (_, i) => `<td class="fcell">${d.pars[i + 1]}</td>`).join('')}
         <td class="frd">${Object.values(d.pars).reduce((a, b) => a + b, 0)}</td></tr>`
     : '';
 
-  const body = rows.map((r, i) => {
-    const name = lbName.get(r.p.id) || r.p.id;
-    const toParCls = r.p.diff < 0 ? 'rg-good' : r.p.diff > 0 ? 'rg-bad' : '';
-    const strokes = r.p.total && r.p.total !== '-' ? r.p.total : '';  // "-" until the round is done
-    return `<tr class="frow${r.p.id === selId ? ' fsel' : ''}" data-pid="${esc(r.p.id)}">
-      <td class="fpos">${posOf[i]}</td><td class="fname">${esc(name)}</td>${r.cells}
-      <td class="frd">${esc(strokes)} <b class="${toParCls}">${fmtPar(r.p.diff)}</b></td></tr>`;
-  }).join('');
+  const body = rows.map((r, i) =>
+    `<tr class="frow${r.wait ? ' fwait' : ''}${r.id === selId ? ' fsel' : ''}" data-pid="${esc(r.id)}">
+      <td class="fpos">${posOf[i]}</td><td class="fname">${esc(lbName.get(r.id) || r.id)}</td>${r.cells}
+      <td class="frd">${r.rd}</td></tr>`).join('');
 
+  const waitHint = waiting.length ? ' · yet-to-start rows show the tee time' : '';
   $('out').innerHTML =
     `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
      <div class="caphint">Each cell = cumulative <b>tournament</b> score to par through that hole · color = the score on that hole
        (<span class="fkey fc-eag">eagle+</span> <span class="fkey fc-bir">birdie</span> <span class="fkey fc-bog">bogey</span> <span class="fkey fc-dbl">double+</span>)
-       · click a row to select that player</div>
+       · click a row to select that player${waitHint}</div>
      <div class="card fieldcard"><div class="fieldwrap"><table class="fieldgrid">
        <thead><tr><th class="fpos"></th><th class="fname">Player</th>
          ${Array.from({ length: 18 }, (_, i) => `<th>${i + 1}</th>`).join('')}
-         <th class="frd">Rd</th></tr>${parRow}</thead>
+         <th class="frd">${d.available ? 'Rd' : 'Tot'}</th></tr>${parRow}</thead>
        <tbody>${body}</tbody>
-     </table></div></div>
-     ${teeWaitHtml(waiting, selId)}`;
+     </table></div></div>`;
 
   $('out').querySelector('tbody').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-pid]');
     if (tr && selectPlayer(tr.dataset.pid)) loadShots();  // re-renders + syncs URL
   });
-  wireTeeWait();
 }
