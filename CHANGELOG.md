@@ -303,3 +303,8 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   for players on the course but "tournament total" for those yet to start.
   Now two honest columns — Rd (strokes + round score once playing) and Tot
   (cumulative tournament score for everyone, matching the last filled cell).
+- **Click a row → inline scorecards**: expanding a player shows one sub-row
+  per round under their row — raw score on every hole, colored by result,
+  with Rd (that round) and Tot (cumulative through it) in the end columns.
+  Clicking again collapses; the click still selects the player app-wide.
+  Rounds come from the same cached per-round payloads, so it's free.

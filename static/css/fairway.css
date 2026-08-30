@@ -462,6 +462,11 @@ table.fieldgrid .fparrow .fpos, table.fieldgrid .fparrow .fname { z-index: 4; }
 .fstar.on { color: var(--sand); }
 .fstar.on svg { fill: var(--sand); }
 tr.favend td { border-bottom: 2px solid var(--line-2); }
+/* expanded player: inline round-by-round scorecards under their row */
+tr.fexp td { font-size: 12px; }
+tr.fexp .fpos { box-shadow: inset 3px 0 0 var(--line-2); }
+tr.fexp .fname { font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
+tr.fexpend td { border-bottom: 2px solid var(--line-2); }
 
 /* course overview: stats lead, the big aerial collapses behind a toggle */
 .cmhead { margin: 2px 2px 8px; }

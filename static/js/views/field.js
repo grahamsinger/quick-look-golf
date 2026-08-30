@@ -6,7 +6,7 @@
 // players yet to tee off sit at their position with an empty row showing
 // their tee time.
 import { $, esc } from '../dom.js';
-import { state } from '../state.js';
+import { state, maxRound } from '../state.js';
 import { api, loadShots } from '../api.js';
 import { isOutPos, fmtTotal } from '../format.js';
 import { selectPlayer } from '../pickers/player.js';
@@ -44,8 +44,13 @@ const FAV_LS = 'fairway-fav-players';
 function loadFavs() { try { return new Set(JSON.parse(localStorage.getItem(FAV_LS)) || []); } catch (e) { return new Set(); } }
 function saveFavs(s) { try { localStorage.setItem(FAV_LS, JSON.stringify([...s])); } catch (e) { /* private mode etc. */ } }
 
+// clicking a row opens that player's round-by-round scorecards inline
+// (and selects them app-wide); clicking again closes it
+let expandedPid = null;
+
 const fmtPar = n => n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`;
 const cellCls = d => d <= -2 ? ' fc-eag' : d === -1 ? ' fc-bir' : d === 1 ? ' fc-bog' : d >= 2 ? ' fc-dbl' : '';
+const sgnCls = n => n < 0 ? 'rg-good' : n > 0 ? 'rg-bad' : '';
 // leaderboard total string ("-12" / "E" / "+3") -> number, unknowns sort last
 const parseTot = t => t === 'E' ? 0 : Number.isFinite(Number(t)) && t !== '' ? Number(t) : Infinity;
 const teeTimeStr = ms => {
@@ -127,6 +132,38 @@ export function renderField() {
         <td class="frd">${Object.values(d.pars).reduce((a, b) => a + b, 0)}</td><td class="ftot"></td></tr>`
     : '';
 
+  // inline scorecards for the expanded player: one sub-row per round —
+  // raw hole scores colored by result, Rd = that round, Tot = through it
+  let expHtml = '';
+  if (expandedPid && ordered.some(r => r.id === expandedPid)) {
+    const parts = [];
+    for (let r = 1; r <= maxRound(); r++) {
+      const rd = getField(tid, r);  // cached; a miss fetches and re-renders
+      if (rd === null) {
+        parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>
+          <td class="fcell fteecell" colspan="18">loading…</td><td class="frd"></td><td class="ftot"></td></tr>`);
+        continue;
+      }
+      const p = rd.available && rd.players.find(x => x.id === expandedPid);
+      if (!p) continue;
+      const by = new Map(p.scores.map(s => [s.h, s]));
+      let cells = '';
+      for (let h = 1; h <= 18; h++) {
+        const s = by.get(h);
+        cells += s ? `<td class="fcell${cellCls(s.s - s.par)}">${s.s}</td>` : '<td class="fcell"></td>';
+      }
+      const strokes = p.total && p.total !== '-' ? p.total : '';
+      const cum = p.start + p.diff;
+      parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>${cells}
+        <td class="frd">${esc(strokes)} <b class="${sgnCls(p.diff)}">${fmtPar(p.diff)}</b></td>
+        <td class="ftot"><b class="${sgnCls(cum)}">${fmtPar(cum)}</b></td></tr>`);
+    }
+    if (parts.length) {
+      parts[parts.length - 1] = parts[parts.length - 1].replace('class="fexp"', 'class="fexp fexpend"');
+      expHtml = parts.join('');
+    }
+  }
+
   const body = ordered.map((r, i) => {
     const fav = favs.has(r.id);
     const name = lbName.get(r.id) || r.id;
@@ -139,7 +176,7 @@ export function renderField() {
     const tot = Number.isFinite(r.end) ? fmtPar(r.end) : '';
     return `<tr class="frow${r.wait ? ' fwait' : ''}${r.id === selId ? ' fsel' : ''}${favEnd}" data-pid="${esc(r.id)}">
       <td class="fpos">${r.pos}</td><td class="fname">${star}${esc(name)}</td>${r.cells}
-      <td class="frd">${r.rd}</td><td class="ftot"><b class="${totCls}">${tot}</b></td></tr>`;
+      <td class="frd">${r.rd}</td><td class="ftot"><b class="${totCls}">${tot}</b></td></tr>${r.id === expandedPid ? expHtml : ''}`;
   }).join('');
 
   const waitHint = waiting.length ? ' · yet-to-start rows show the tee time' : '';
@@ -147,7 +184,7 @@ export function renderField() {
     `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
      <div class="caphint">Each cell = cumulative <b>tournament</b> score to par through that hole · color = the score on that hole
        (<span class="fkey fc-eag">eagle+</span> <span class="fkey fc-bir">birdie</span> <span class="fkey fc-bog">bogey</span> <span class="fkey fc-dbl">double+</span>)
-       · click a row to select that player · ★ pins favorites to the top${waitHint}</div>
+       · click a row to open that player's round-by-round scorecards (and select them) · ★ pins favorites to the top${waitHint}</div>
      <div class="card fieldcard"><div class="fieldwrap"><table class="fieldgrid">
        <thead><tr><th class="fpos"></th><th class="fname">Player</th>
          ${Array.from({ length: 18 }, (_, i) => `<th>${i + 1}</th>`).join('')}
@@ -165,6 +202,9 @@ export function renderField() {
       return;  // toggling a star never changes the selected player
     }
     const tr = e.target.closest('tr[data-pid]');
-    if (tr && selectPlayer(tr.dataset.pid)) loadShots();  // re-renders + syncs URL
+    if (!tr) return;
+    expandedPid = expandedPid === tr.dataset.pid ? null : tr.dataset.pid;
+    if (selectPlayer(tr.dataset.pid)) loadShots();  // re-renders + syncs URL
+    else renderField();
   });
 }
