@@ -232,3 +232,22 @@ strokes list (plus their in-progress round), so the arrows only walk rounds
 that exist for that player and "All rounds" is always one step past their
 last one. Options rebuild on every player switch; a selected round past the
 new player's last one clamps down to it.
+
+## Aug 2026 — course stats for the week (Course view)
+
+How the field played each hole, from the `courseStats(tournamentId)` GraphQL
+query (the site's Course Stats tab — new `/api/coursestats` proxy):
+
+- **Overview table** under the full-course aerial: par, yards, scoring
+  average, to-par diff (colored over/under), difficulty rank, and
+  eagle→double-bogey counts per hole, with OUT/IN/TOTAL rows. Pills switch
+  between **All Rounds** and each round's block (per-round yardages show
+  moved-up tees); clicking a row zooms that hole. Events with stats but no
+  aerial still get the table.
+- **Hole zoom strip** under the nav bar: the same numbers for the open hole,
+  following the trail selection (all-rounds overlay → All Rounds block,
+  single round → that round's block).
+- Caching matches the rest: durable (Redis + SQLite) once rounds 1–4 all
+  have a non-live block, 30 s TTL while the week is still moving. Counts are
+  exact buckets — triples+ aren't bucketed by the API (averages include
+  them).

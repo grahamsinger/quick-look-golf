@@ -135,6 +135,31 @@ function getHoleMap(tid, hole) {
   return holeMapCache.get(key);
 }
 
+// Field scoring for the week (courseStats): per-hole average, to-par diff,
+// difficulty rank and score counts, in an "All Rounds" block plus one per
+// round. statsPick = which block the overview table shows (a pill label);
+// it resets when the tournament changes.
+const statsCache = new Map();  // tournamentId -> coursestats payload | null (in flight)
+let statsPick = null, statsTid = null;
+function getCourseStats(tid) {
+  if (statsTid !== tid) { statsTid = tid; statsPick = null; }
+  const cs = statsCache.get(tid);
+  if (cs === undefined) {
+    statsCache.set(tid, null);
+    api(`/api/coursestats?tournamentId=${encodeURIComponent(tid)}`)
+      .then(res => { statsCache.set(tid, res); if (state.view === 'course') renderCourse(); })
+      .catch(() => { statsCache.set(tid, { available: false }); if (state.view === 'course') renderCourse(); });
+  }
+  return statsCache.get(tid);
+}
+
+// multi-course weeks: stats follow the host course (the one the aerial shows)
+function hostCourseStats(payload) {
+  if (!payload || !payload.available) return null;
+  const cs = (payload.courses || []).find(c => c.hostCourse) || (payload.courses || [])[0];
+  return cs && (cs.rounds || []).length ? cs : null;
+}
+
 // All-rounds shot data for the hole overlay, fetched lazily (fetchRound's
 // client cache makes repeat zooms free for completed rounds).
 let allShots = null;  // { key: "tid:pid", rounds: {r: shotsData} } | {key, loading}
@@ -187,9 +212,57 @@ function trailSvg(pts, dotR = 6) {
   return `<polyline points="${ptsAttr}"/>${dots}`;
 }
 
+// --- course stats (how the field played each hole) -------------------------
+
+const fmtDiff = d => esc((d || '').replace('-', '−'));
+const diffCls = t => t === 'ABOVE' ? 'rg-bad' : t === 'BELOW' ? 'rg-good' : '';
+const ord = n => {
+  const t = n % 100;
+  return n + (t > 10 && t < 14 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+};
+
+function courseStatsCard(payload, zoomable = true) {
+  const cs = hostCourseStats(payload);
+  if (!cs) return '';
+  const blk = cs.rounds.find(b => b.label === statsPick) || cs.rounds[0];
+  const pills = cs.rounds.map(b =>
+    `<button type="button" class="spill${b === blk ? ' on' : ''}" data-pill="${esc(b.label)}">${esc(b.label)}${b.live ? '<i class="lived"></i>' : ''}</button>`).join('');
+  const num = v => v == null ? '' : v;
+  const rows = (blk.rows || []).map(r => {
+    const mid = `<td class="num">${num(r.par)}</td><td class="num">${num(r.yards)}</td>` +
+      `<td class="num avgc">${esc(r.avg || '')}</td><td class="num ${diffCls(r.tendency)}">${fmtDiff(r.diff)}</td>`;
+    const counts = `<td class="num">${num(r.eagles)}</td><td class="num">${num(r.birdies)}</td>` +
+      `<td class="num">${num(r.pars)}</td><td class="num">${num(r.bogeys)}</td><td class="num">${num(r.doubles)}</td>`;
+    return r.hole != null
+      ? `<tr${zoomable ? ` data-hole="${r.hole}"` : ''}><td class="hole">${r.hole}</td>${mid}<td class="num">${num(r.rank)}</td>${counts}</tr>`
+      : `<tr class="sumrow"><td class="hole">${esc(r.label || '')}</td>${mid}<td></td>${counts}</tr>`;
+  }).join('');
+  return `<div class="card statscard">
+    <div class="statsbar"><span class="statstitle">Course stats</span>
+      ${(payload.courses || []).length > 1 ? `<span class="statsmeta">${esc(cs.courseName || '')}</span>` : ''}
+      <span class="statspills">${pills}</span></div>
+    <table class="cstats">
+      <thead><tr><th>Hole</th><th>Par</th><th>Yds</th><th>Avg</th><th>±</th><th title="1 = hardest">Rank</th>
+        <th title="Eagles">E</th><th title="Birdies">B</th><th title="Pars">P</th><th title="Bogeys">Bo</th><th title="Double bogeys">D</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="caphint statshint">How the field played each hole · rank <b>1</b> = hardest · E/B/P/Bo/D = eagles → double bogeys (triples+ not bucketed)${zoomable ? ' · click a hole to zoom' : ''}</div>
+  </div>`;
+}
+
+function wireStatsCard() {
+  const sc = $('out').querySelector('.statscard');
+  if (!sc) return;
+  sc.querySelectorAll('.spill').forEach(b =>
+    b.addEventListener('click', () => { statsPick = b.dataset.pill; renderCourse(); }));
+  sc.querySelectorAll('tr[data-hole]').forEach(tr =>
+    tr.addEventListener('click', () => zoomToHole(Number(tr.dataset.hole))));
+}
+
 // --- full-course view ------------------------------------------------------
 
 function renderFullCourse(cm) {
+  const tid = $('tourn').value;
   const d = state.shots;
   const holes = (d && d.holes) || [];
   if (!holes.length) { $('out').innerHTML = '<div class="summary"><span class="meta">No shot data for this round.</span></div>'; return; }
@@ -217,11 +290,13 @@ function renderFullCourse(cm) {
      <div class="card coursemap"><div class="cmwrap">
        <img src="${esc(cm.imageUrl)}" alt="Course aerial" draggable="false" />
        <svg viewBox="0 0 2048 2048" role="img" aria-label="Shot trails over the course aerial">${groups.map(trail).join('')}</svg>
-     </div></div>`;
+     </div></div>
+     ${courseStatsCard(getCourseStats(tid))}`;
   $('out').querySelector('.cmwrap svg').addEventListener('click', (e) => {
     const g = e.target.closest('.chole');
     if (g && g.dataset.hole) zoomToHole(Number(g.dataset.hole));
   });
+  wireStatsCard();
 }
 
 // --- per-hole zoom ---------------------------------------------------------
@@ -396,6 +471,25 @@ function renderHole(cm) {
   const noData = trails.length ? '' :
     '<div class="summary"><span class="meta">No shot trail for this hole in the selected round.</span></div>';
 
+  // how the field played this hole, from the block matching the trails
+  // (all-rounds overlay -> "All Rounds", single round -> that round's block)
+  let hfield = '';
+  const fieldCs = hostCourseStats(getCourseStats(tid));
+  if (fieldCs) {
+    const blk = (allMode ? null : fieldCs.rounds.find(b => b.round === rounds[0]))
+      || fieldCs.rounds.find(b => !b.round) || fieldCs.rounds[0];
+    const row = (blk.rows || []).find(r => r.hole === holeNum);
+    if (row) {
+      hfield = `<div class="hfield"><span class="hfl">Field · ${esc((blk.label || '').toLowerCase())}</span>` +
+        (row.yards ? `<span>${row.yards} yds</span>` : '') +
+        `<span>avg <b>${esc(row.avg || '')}</b> <b class="${diffCls(row.tendency)}">${fmtDiff(row.diff)}</b></span>` +
+        (row.rank ? `<span>${ord(row.rank)} hardest</span>` : '') +
+        `<span class="hfc">E <b>${row.eagles}</b></span><span class="hfc">B <b>${row.birdies}</b></span>` +
+        `<span class="hfc">P <b>${row.pars}</b></span><span class="hfc">Bo <b>${row.bogeys}</b></span>` +
+        `<span class="hfc">D <b>${row.doubles}</b></span></div>`;
+    }
+  }
+
   // shot-by-shot verbiage under the aerial (the feed's own play-by-play);
   // drops/penalties appear as unnumbered muted lines, like the Tour's panel
   const pbp = trails.length ? `<div class="pbp">${rounds.map(r => {
@@ -434,7 +528,7 @@ function renderHole(cm) {
            ${manual && !adjustMode ? '<button type="button" class="hadjreset" title="Remove the saved adjustment">reset</button>' : ''}
          </span>
        </div>
-       ${noData}
+       ${hfield}${noData}
        <div class="cmwrap cmwrap-hole" style="${wrapStyle}">
          <svg viewBox="0 0 ${boxW} ${boxH}" preserveAspectRatio="none" role="img" aria-label="Shot trails over the hole aerial">
            <g${gT ? ` transform="${gT}"` : ''}>
@@ -507,13 +601,19 @@ window.addEventListener('resize', () => {
 
 export function renderCourse() {
   const tid = $('tourn').value;
+  getCourseStats(tid);  // start the fetch alongside the map (both re-render)
   const cm = getCourseMap(tid);
   if (cm === null || cm === undefined) {
     $('out').innerHTML = '<div class="summary"><span class="meta">Loading course map…</span></div>';
     return;
   }
   if (!cm.available) {
-    $('out').innerHTML = '<div class="summary"><span class="meta">No course map for this tournament — TOURCAST doesn\'t publish aerial assets for it (typically only smaller/opposite-field events).</span></div>';
+    // no aerial, but the field stats may still exist — show them alone
+    // (rows aren't zoomable: there's no hole imagery to zoom into)
+    $('out').innerHTML =
+      `<div class="summary"><span class="meta">No course map for this tournament — TOURCAST doesn\'t publish aerial assets for it (typically only smaller/opposite-field events).</span></div>
+       ${courseStatsCard(getCourseStats(tid), false)}`;
+    wireStatsCard();
     return;
   }
   if (state.courseHole) { renderHole(cm); return; }

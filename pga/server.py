@@ -32,7 +32,7 @@ from fastapi.staticfiles import StaticFiles
 
 import httpx
 
-from .client import PGATourClient, _USER_AGENT
+from .client import GraphQLError, PGATourClient, _USER_AGENT
 
 # Cache-key namespace. Bump CACHE_VERSION to invalidate everything after a
 # change to the derived data shape (completed rounds are stored with no expiry).
@@ -578,6 +578,110 @@ def holemap(response: Response, tournamentId: str, hole: int, refresh: bool = Fa
                 "c": tfw[4], "f": tfw[5], "fullW": tfw[6], "fullH": tfw[7]},
     }
     _cache_set(key, json.dumps(out))
+    response.headers["X-Cache"] = "MISS"
+    return out
+
+
+@app.get("/api/coursestats")
+def coursestats(response: Response, tournamentId: str, refresh: bool = False) -> dict:
+    """Hole-by-hole field scoring for the week (the site's Course Stats tab):
+    scoring average, to-par diff, difficulty rank, and per-score counts, with
+    an "All Rounds" block plus one block per completed/live round.
+
+    Row order is preserved from the feed (holes 1-9, OUT, 10-18, IN, TOTAL);
+    hole rows carry `hole`, summary rows carry `label` instead. `doubles` is
+    exactly double bogeys — triples+ aren't bucketed by the API (the averages
+    still include them).
+    """
+    key = f"golf:{CACHE_VERSION}:coursestats:{tournamentId}"
+    if refresh:
+        _cache_del(key)
+    else:
+        cached = _cache_get(key)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            return json.loads(cached)
+    q = """
+    query CourseStats($tid: ID!) {
+      courseStats(tournamentId: $tid) {
+        courses {
+          courseId courseName par yardage hostCourse
+          roundHoleStats {
+            roundHeader roundNum live
+            holeStats {
+              __typename
+              ... on CourseHoleStats {
+                courseHoleNum parValue yards
+                scoringAverage scoringAverageDiff scoringDiffTendency
+                eagles birdies pars bogeys doubleBogey rank
+              }
+              ... on SummaryRow {
+                rowType par yardage scoringAverage scoringAverageDiff scoringDiffTendency
+                eagles birdies pars bogeys doubleBogey
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    try:
+        data = client.query(q, {"tid": tournamentId}, "CourseStats").get("courseStats")
+    except GraphQLError:
+        data = None  # events without ShotLink stats
+    courses = []
+    for cr in (data or {}).get("courses") or []:
+        blocks = []
+        for blk in cr.get("roundHoleStats") or []:
+            rows = []
+            for row in blk.get("holeStats") or []:
+                common = {
+                    "avg": row.get("scoringAverage"),
+                    "diff": row.get("scoringAverageDiff"),
+                    "tendency": row.get("scoringDiffTendency"),
+                    "eagles": row.get("eagles"),
+                    "birdies": row.get("birdies"),
+                    "pars": row.get("pars"),
+                    "bogeys": row.get("bogeys"),
+                    "doubles": row.get("doubleBogey"),
+                }
+                if row.get("__typename") == "CourseHoleStats":
+                    rows.append({
+                        "hole": row.get("courseHoleNum"),
+                        "par": row.get("parValue"),
+                        "yards": row.get("yards"),
+                        "rank": row.get("rank"),
+                        **common,
+                    })
+                else:  # OUT / IN / TOTAL
+                    rows.append({
+                        "label": row.get("rowType"),
+                        "par": row.get("par"),
+                        "yards": row.get("yardage"),
+                        **common,
+                    })
+            blocks.append({
+                "label": blk.get("roundHeader"),
+                "round": blk.get("roundNum"),
+                "live": bool(blk.get("live")),
+                "rows": rows,
+            })
+        courses.append({
+            "courseId": cr.get("courseId"),
+            "courseName": cr.get("courseName"),
+            "par": cr.get("par"),
+            "yardage": cr.get("yardage"),
+            "hostCourse": bool(cr.get("hostCourse")),
+            "rounds": blocks,
+        })
+    out = {"available": bool(courses), "courses": courses}
+    if courses:
+        # immutable once rounds 1-4 all have a non-live block; otherwise the
+        # numbers still move (live play, or future rounds not yet listed)
+        played = {b["round"] for c in courses for b in c["rounds"] if b["round"]}
+        live = any(b["live"] for c in courses for b in c["rounds"])
+        final = played >= {1, 2, 3, 4} and not live
+        _cache_set(key, json.dumps(out), ttl=None if final else LIVE_TTL_S)
     response.headers["X-Cache"] = "MISS"
     return out
 

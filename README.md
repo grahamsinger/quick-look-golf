@@ -63,6 +63,12 @@ default. Self-hosted Fraunces display serif.
   color-coded (tee-shot dispersion at a glance). Available for
   ShotLink-enhanced events (most of the schedule); smaller opposite-field
   events don't publish the imagery and fall back gracefully.
+  - **Course stats for the week** under the aerial: per hole — par, yards,
+    scoring average, to-par diff, difficulty rank, and
+    eagle/birdie/par/bogey/double counts, with OUT/IN/TOTAL rows and pills for
+    **All Rounds** or any single round (per-round yardage shows moved-up
+    tees). Click a row to zoom the hole; the hole zoom shows the same numbers
+    for the open hole in a **field strip** that follows the round selection.
 - **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=&h=`), so a
   reload restores the view and a **copy-link** button shares it. A freshness bar
   shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp
