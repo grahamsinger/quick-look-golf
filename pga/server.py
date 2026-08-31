@@ -22,6 +22,7 @@ import re
 import sqlite3
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -255,8 +256,22 @@ def graphql_passthrough(body: dict[str, Any]) -> JSONResponse:
 
 
 @app.get("/api/schedule")
-def schedule(year: str = "2026", tour: str = "R") -> dict:
-    """Flat list of tournaments for a season: [{id, name, startDate}]."""
+def schedule(response: Response, year: str = "2026", tour: str = "R", refresh: bool = False) -> dict:
+    """Flat list of tournaments for a season: [{id, name, startDate}].
+
+    Cached: a past season's schedule is effectively immutable (durable entry);
+    the current season gets a short TTL so statuses roll over during a live
+    week. The key leads with the year (not an R-id) so the admin rollup,
+    which groups on an R-prefixed second segment, skips these.
+    """
+    key = f"golf:{CACHE_VERSION}:schedule:{year}:{tour}"
+    if refresh:
+        _cache_del(key)
+    else:
+        cached = _cache_get(key)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            return json.loads(cached)
     q = """
     query Schedule($tourCode: String!, $year: String!) {
       schedule(tourCode: $tourCode, year: $year) {
@@ -285,7 +300,12 @@ def schedule(year: str = "2026", tour: str = "R") -> dict:
                     }
                 )
     out.sort(key=lambda t: t.get("startDate") or 0)
-    return {"tournaments": out}
+    payload = {"tournaments": out}
+    if out:
+        past = year.isdigit() and int(year) < time.localtime().tm_year
+        _cache_set(key, json.dumps(payload), ttl=None if past else 600)
+    response.headers["X-Cache"] = "MISS"
+    return payload
 
 
 @app.get("/api/leaderboard")
@@ -746,15 +766,21 @@ query HBH($tid: ID!, $r: Int!) {
 """
 
 
-def _holebyhole_round(tid: str, rnd: int, refresh: bool = False) -> dict:
+def _holebyhole_round(tid: str, rnd: int, refresh: bool = False,
+                      final_hint: bool = False) -> dict:
     """Trimmed leaderboardHoleByHole for one round, cached.
 
     Durable once the round is over: every player either has a full scorecard
     or none (a partial card means live play — or an overnight suspension —
     so those stay on the short TTL), or the tournament has moved past the
-    round. Field members who didn't play the round (missed cut, WD) are
-    dropped. `diff` = the player's round total relative to par, summed from
-    per-hole scores so multi-course weeks use each card's own pars.
+    round. That heuristic has a blind spot: a mid-round WD in the FINAL
+    round leaves a permanently partial card with currentRound == round, so
+    the round would sit on the TTL forever — `final_hint=True` (set by the
+    season bulk loader, which only walks completed tournaments) overrides
+    it and pins the round durable. Field members who didn't play the round
+    (missed cut, WD) are dropped. `diff` = the player's round total relative
+    to par, summed from per-hole scores so multi-course weeks use each
+    card's own pars.
     """
     key = f"golf:{CACHE_VERSION}:holebyhole:{tid}:{rnd}"
     if refresh:
@@ -819,7 +845,9 @@ def _holebyhole_round(tid: str, rnd: int, refresh: bool = False) -> dict:
             "multiCourse": len(courses) > 1,
             "players": players,
         }
-    final = out["available"] and ((out.get("currentRound") or 0) > rnd or not partial)
+    final = out["available"] and (
+        final_hint or (out.get("currentRound") or 0) > rnd or not partial
+    )
     _cache_set(key, json.dumps(out), ttl=None if final else LIVE_TTL_S)
     return out
 
@@ -842,6 +870,130 @@ def holebyhole(response: Response, tournamentId: str, round: int, refresh: bool 
                 starts[p["id"]] = starts.get(p["id"], 0) + p["diff"]
         data["players"] = [{**p, "start": starts.get(p["id"], 0)} for p in data["players"]]
     return data
+
+
+# --- season bulk download ---------------------------------------------------
+# One background job at a time walks a season's completed tournaments and
+# warms the field-facing caches: hole-by-hole scorecards for every played
+# round, the course-stats table, and the aerial assets (course map + the 18
+# hole world files). Shot-level detail (shotDetailsV3) is deliberately NOT
+# bulk-fetched — that's ~600 GraphQL queries per event; player rounds keep
+# loading on demand. A few tournaments run concurrently, each fetching
+# sequentially with a pause between its upstream calls — cache hits skip the
+# pause, so re-running a season is a cheap fill-in-the-gaps pass.
+_BULK_WORKERS = 4         # tournaments in flight at once
+_BULK_PACE_S = 0.5        # between GraphQL queries that actually hit the API
+_BULK_ASSET_PACE_S = 0.1  # between tourcast CDN asset fetches
+_bulk_lock = threading.Lock()
+_bulk_cancel = threading.Event()
+_bulk: dict[str, Any] = {"running": False}
+
+
+def _bulk_pace(cache_hit: bool, pause: float = _BULK_PACE_S) -> None:
+    if not cache_hit:
+        time.sleep(pause)
+
+
+def _bulk_one(tid: str) -> dict:
+    """Warm one tournament's caches; returns what landed."""
+    rec: dict[str, Any] = {"id": tid, "fieldRounds": 0, "stats": False,
+                           "coursemap": False, "holemaps": 0, "error": None}
+    try:
+        hit = _cache_get(f"golf:{CACHE_VERSION}:holebyhole:{tid}:1") is not None
+        r1 = _holebyhole_round(tid, 1, final_hint=True)
+        _bulk_pace(hit)
+        if r1.get("available"):
+            rec["fieldRounds"] = 1
+            # round 1's currentRound = the last round played, so a 54-hole
+            # weather week costs three queries, not four
+            for rnd in range(2, min(r1.get("currentRound") or 4, 4) + 1):
+                if _bulk_cancel.is_set():
+                    return rec
+                hit = _cache_get(f"golf:{CACHE_VERSION}:holebyhole:{tid}:{rnd}") is not None
+                if _holebyhole_round(tid, rnd, final_hint=True).get("available"):
+                    rec["fieldRounds"] += 1
+                _bulk_pace(hit)
+        resp = Response()
+        rec["stats"] = bool(coursestats(resp, tid).get("available"))
+        _bulk_pace(resp.headers.get("X-Cache") == "HIT")
+        resp = Response()
+        rec["coursemap"] = bool(coursemap(resp, tid).get("available"))
+        _bulk_pace(resp.headers.get("X-Cache") == "HIT", _BULK_ASSET_PACE_S)
+        if rec["coursemap"]:
+            for h in range(1, 19):
+                if _bulk_cancel.is_set():
+                    return rec
+                resp = Response()
+                if holemap(resp, tid, h).get("available"):
+                    rec["holemaps"] += 1
+                _bulk_pace(resp.headers.get("X-Cache") == "HIT", _BULK_ASSET_PACE_S)
+    except Exception as e:  # noqa: BLE001 — keep walking the season; report it
+        rec["error"] = str(e)
+    return rec
+
+
+def _bulk_run_one(t: dict) -> None:
+    if _bulk_cancel.is_set():  # queued behind the cancel: don't start
+        return
+    with _bulk_lock:
+        _bulk["current"].append(t["name"])
+    rec = _bulk_one(t["id"])
+    rec["name"] = t["name"]
+    with _bulk_lock:
+        if t["name"] in _bulk["current"]:
+            _bulk["current"].remove(t["name"])
+        _bulk["results"].append(rec)
+        _bulk["done"] += 1
+
+
+def _bulk_worker(year: str) -> None:
+    try:
+        tourns = schedule(Response(), year=year)["tournaments"]
+    except Exception as e:  # noqa: BLE001
+        with _bulk_lock:
+            _bulk.update(running=False, error=f"schedule: {e}", finishedAt=time.time())
+        return
+    # only completed events: a live week's numbers are still moving, and a
+    # future one has nothing to fetch
+    todo = [t for t in tourns if t.get("tournamentStatus") == "COMPLETED"]
+    with _bulk_lock:
+        _bulk.update(total=len(todo), skipped=len(tourns) - len(todo))
+    with ThreadPoolExecutor(max_workers=_BULK_WORKERS, thread_name_prefix="bulk") as pool:
+        list(pool.map(_bulk_run_one, todo))
+    with _bulk_lock:
+        _bulk["cancelled"] = _bulk_cancel.is_set()
+        _bulk.update(running=False, current=[], finishedAt=time.time())
+
+
+@app.get("/api/bulkload")
+def bulkload_status() -> dict:
+    """Progress of the season download job ({running: false} if none yet)."""
+    with _bulk_lock:
+        return json.loads(json.dumps(_bulk))  # snapshot, not the live dict
+
+
+@app.post("/api/bulkload")
+def bulkload_start(year: str) -> dict:
+    """Kick off a season download (409 if one is already running)."""
+    if not (year.isdigit() and 2012 <= int(year) <= time.localtime().tm_year):
+        raise HTTPException(400, f"year must be 2012–{time.localtime().tm_year}")
+    with _bulk_lock:
+        if _bulk.get("running"):
+            raise HTTPException(409, "a season download is already running")
+        _bulk_cancel.clear()
+        _bulk.clear()
+        _bulk.update(running=True, year=year, total=None, skipped=0, done=0,
+                     current=[], results=[], error=None, cancelled=False,
+                     startedAt=time.time(), finishedAt=None)
+    threading.Thread(target=_bulk_worker, args=(year,), daemon=True).start()
+    return bulkload_status()
+
+
+@app.delete("/api/bulkload")
+def bulkload_cancel() -> dict:
+    """Ask the running job to stop after the current fetch."""
+    _bulk_cancel.set()
+    return bulkload_status()
 
 
 @app.get("/api/cachestats")

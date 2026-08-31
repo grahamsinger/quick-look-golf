@@ -17,6 +17,16 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   feel too generous or stingy over time.
 
 ## Possible improvements
+- **Non-standard formats need support** (surfaced by the 2025 season
+  download; today they just show "—" for field rounds): the **Ryder Cup**
+  (match play — no stroke-play scorecards in `leaderboardHoleByHole`; the
+  schema has separate match-play types worth exploring) and the **Zurich
+  Classic** (two-man teams — the individual-keyed holebyhole comes back
+  empty; team scorecards likely live under a team variant of the query).
+  The **Grant Thornton Invitational** (mixed PGA/LPGA teams) already works
+  as a 3-round event, and 54-hole weather weeks are handled (round 1's
+  `currentRound` caps the walk). Presidents Cup years will hit the
+  match-play gap too.
 - **Course view ideas** (overview + per-hole zoom shipped — see CHANGELOG;
   projection recipes documented there and in `static/js/views/course.js` /
   `/api/coursemap` / `/api/holemap`):
@@ -52,8 +62,13 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   course-stats cell via `leaderboardHoleByHole`); color a player's scorecard
   by how the field played each hole that day; auto-load on tournament switch
   (today it's pick-then-Load, long-standing behavior).
-- **Admin page actions** — `/admin` is read-only by design; purge-per-
-  tournament buttons would be a small addition if wanted.
+- **Admin page actions** — the inventory is read-only (the season download
+  is the one write path); purge-per-tournament buttons would be a small
+  addition if wanted. A "download everything 2012–now" convenience loop is
+  trivial on top of `/api/bulkload` too.
+- **Bulk-download depth** — the season download deliberately skips
+  shot-level detail; an opt-in "also fetch shot details for the top N
+  finishers" tier is possible if browsing old events' Course view matters.
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*
   shows the chip distance (in feet), because "the shot that set up the putt" is
   the chip. Optional: separately surface the *approach into the green* distance.
@@ -65,8 +80,9 @@ Ideas discussed but not built, and things to verify. Shipped work is in
 - **Live subscriptions** — the schema exposes `OnUpdate*` subscriptions over
   `orchestrator-ws.pgatour.com/graphql`; could stream live updates instead of
   manual refresh.
-- **Cache leaderboard/schedule** — currently uncached; a short TTL (leaderboard
-  ~30–60s, schedule ~hours) would offload the API further.
+- **Cache the leaderboard** — still uncached (the schedule is cached now:
+  durable for past seasons, 10 min for the current); a ~30–60s TTL on
+  `/api/leaderboard` would offload the API further during live play.
 - **Simplify client cache** — the in-browser `Map` is largely redundant with the
   loopback Redis layer; could drop it.
 - **Tests** — none yet; `static/js/format.js` (pure: parseHad / expectedProx /

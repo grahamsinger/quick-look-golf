@@ -17,22 +17,47 @@
   <link rel="icon" href="/favicon.svg" />
   <style>
     .admin { padding: 18px 24px 40px; max-width: 1180px; }
-    .astats { display: flex; gap: 28px; flex-wrap: wrap; margin: 14px 2px 16px; font-size: 13px; color: var(--ink-2); }
+    .astats { display: flex; gap: 28px; flex-wrap: wrap; margin: 14px 2px 12px; font-size: 13px; color: var(--ink-2); }
     .astats b { color: var(--ink); font-variant-numeric: tabular-nums; }
     .astats .bad { color: var(--bad); }
-    table.cadmin { border-collapse: collapse; }
+    .bulkbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 2px 16px; }
+    .bulkbar label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+    .bulkbar select { font: inherit; font-size: 13px; color: var(--ink); background: var(--card);
+      border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 6px 9px; }
+    .bulkbar .btn-primary { height: 33px; padding: 0 14px; font-size: 12.5px; }
+    .btn-ghost { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px;
+      font-weight: 600; color: var(--pine); background: none; border: 1px solid var(--line-2);
+      border-radius: var(--r-sm); padding: 4px 11px; cursor: pointer; }
+    .btn-ghost:hover { border-color: var(--pine); }
+    .btn-ghost:disabled { opacity: .45; cursor: default; }
+    /* .btn-ghost's display beats the UA's [hidden] rule without this */
+    [hidden] { display: none !important; }
+    .bulkmsg { display: inline-flex; align-items: center; font-size: 13px; color: var(--ink-2);
+      font-variant-numeric: tabular-nums; }
+    .bulkmsg .bad { color: var(--bad); }
+    table.cadmin { border-collapse: collapse; width: 100%; }
     table.cadmin th, table.cadmin td { padding: 7px 13px; border-bottom: 1px solid var(--line);
       font-size: 13px; text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
     table.cadmin thead th { color: var(--ink-3); font-weight: 700; font-size: 10px;
       text-transform: uppercase; letter-spacing: .08em; border-bottom: 1.5px solid var(--line-2); }
     table.cadmin td.num, table.cadmin th.num { text-align: right; }
-    table.cadmin tbody tr:last-child td { border-bottom: none; }
     table.cadmin a { color: var(--pine); text-decoration: none; font-weight: 560; }
     table.cadmin a:hover { text-decoration: underline; }
-    table.cadmin .yr { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; color: var(--ink); }
     .ok { color: var(--good); } .muted { color: var(--ink-3); }
     .livechip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px;
       background: var(--flag-tint); color: var(--flag); font-weight: 640; margin-left: 6px; }
+    /* year groups: a clickable header row per season, rows hidden when closed */
+    tr.yhead td { padding: 0; background: var(--card-2); border-bottom: 1px solid var(--line-2); }
+    .yh { display: flex; align-items: center; gap: 10px; padding: 7px 13px; cursor: pointer; user-select: none; }
+    .yh .chev { width: 14px; height: 14px; color: var(--ink-3); transition: transform .15s; flex: none; }
+    .ygroup.closed .yh .chev { transform: rotate(-90deg); }
+    .ygroup.closed tr.trow { display: none; }
+    .yh .yr { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600;
+      font-size: 15px; color: var(--ink); }
+    .yh .ymeta { color: var(--ink-3); font-size: 12px; }
+    .yh .sp { flex: 1; }
+    .yh .ydl .ic { width: 13px; height: 13px; }
+    @media (prefers-reduced-motion: reduce) { .yh .chev { transition: none; } }
   </style>
 </head>
 <body>
@@ -59,49 +84,60 @@
     <div class="summary"><span class="who">What's in the cache</span>
       <span class="meta">every tournament with data in Redis or SQLite</span></div>
     <div class="astats" id="astats">loading…</div>
-    <div class="card"><table class="cadmin">
-      <thead><tr><th>Season</th><th>Tournament</th><th class="num">Player rounds</th>
+    <div class="bulkbar">
+      <label for="bulkYear">Download a season</label>
+      <select id="bulkYear"></select>
+      <button id="bulkGo" class="btn-primary" type="button">
+        <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8"/><path d="M4.5 7 8 10.5 11.5 7"/><path d="M3 13.5h10"/></svg>
+        Download
+      </button>
+      <button id="bulkStop" class="btn-ghost" type="button" hidden>Stop</button>
+      <span id="bulkMsg" class="bulkmsg"></span>
+    </div>
+    <div class="card"><table class="cadmin" id="ctable">
+      <thead><tr><th>Tournament</th><th class="num">Player rounds</th>
         <th class="num">Field rounds</th><th class="num">Hole maps</th><th>Course map</th>
         <th>Stats</th><th class="num">Size</th><th>Last capture</th></tr></thead>
-      <tbody id="rows"><tr><td colspan="9" class="muted">loading…</td></tr></tbody>
+      <tbody><tr><td colspan="8" class="muted">loading…</td></tr></tbody>
     </table></div>
     <div class="caphint">Durable entries live in Redis + SQLite (<code>data/cache.sqlite</code>); a
       <span class="livechip">live</span> marker means the tournament also holds short-TTL Redis-only
-      payloads from in-progress play. Player rounds = cached shot-detail captures (players × rounds).</div>
+      payloads from in-progress play. Player rounds = cached shot-detail captures (players × rounds) —
+      those load on demand per player. <b>Download</b> walks a season's completed events and grabs each
+      one's field scorecards, course stats, and aerials in one pass.</div>
   </main>
 
   <script type="module">
+    const $ = id => document.getElementById(id);
     const fmtBytes = n => n == null ? '—'
       : n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + ' MB'
       : n >= 1024 ? (n / 1024).toFixed(0) + ' KB' : n + ' B';
     const fmtWhen = ts => ts ? new Date(ts * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
 
-    const stats = await fetch('/api/cachestats').then(r => r.json());
-    const total = stats.tournaments.reduce((a, t) => a + t.bytes, 0);
-    document.getElementById('astats').innerHTML =
-      `<span>Redis <b class="${stats.redisOk ? 'ok' : 'bad'}">${stats.redisOk ? 'connected' : 'unreachable'}</b></span>
-       <span>SQLite file <b>${fmtBytes(stats.dbBytes)}</b></span>
-       <span>entries <b>${stats.entryCount}</b></span>
-       <span>tournaments <b>${stats.tournaments.length}</b></span>
-       <span>cached payloads <b>${fmtBytes(total)}</b></span>`;
+    const FIRST_SEASON = 2012, THIS_YEAR = new Date().getFullYear();
+    const OPEN_LS = 'fairway-admin-open';
+    let openState = {};            // explicit year toggles; default = newest open
+    try { openState = JSON.parse(localStorage.getItem(OPEN_LS)) || {}; } catch (e) {}
+    const saveOpen = () => { try { localStorage.setItem(OPEN_LS, JSON.stringify(openState)); } catch (e) {} };
 
-    // label tournaments via the schedule (usually one or two seasons' worth)
-    const names = new Map();
-    const years = [...new Set(stats.tournaments.map(t => t.id.slice(1, 5)))];
-    await Promise.all(years.map(async y => {
-      try {
-        const s = await fetch(`/api/schedule?year=${y}`).then(r => r.json());
-        s.tournaments.forEach(t => names.set(t.id, t.name));
-      } catch (e) { /* row falls back to the raw id */ }
-    }));
+    for (let y = THIS_YEAR; y >= FIRST_SEASON; y--)
+      $('bulkYear').insertAdjacentHTML('beforeend', `<option>${y}</option>`);
 
-    const rows = stats.tournaments
-      .slice()
-      .sort((a, b) => b.id.slice(1, 5) - a.id.slice(1, 5) || (b.at || 0) - (a.at || 0));
-    document.getElementById('rows').innerHTML = rows.map(t => `
-      <tr>
-        <td class="yr">${t.id.slice(1, 5)}</td>
-        <td><a href="/?t=${t.id}">${names.get(t.id) || t.id}</a>${t.liveEntries ? '<span class="livechip">live</span>' : ''}</td>
+    // schedule lookups: id -> {name, i} (i = calendar position within the season)
+    const sched = new Map();
+    async function loadNames(years) {
+      await Promise.all(years.map(async y => {
+        try {
+          const s = await fetch(`/api/schedule?year=${y}`).then(r => r.json());
+          s.tournaments.forEach((t, i) => sched.set(t.id, { name: t.name, i }));
+        } catch (e) { /* rows fall back to the raw id */ }
+      }));
+    }
+
+    function rowHtml(t) {
+      const s = sched.get(t.id);
+      return `<tr class="trow">
+        <td><a href="/?t=${t.id}">${s ? s.name : t.id}</a>${t.liveEntries ? '<span class="livechip">live</span>' : ''}</td>
         <td class="num">${t.shotRounds ? `${t.shotRounds} <span class="muted">(${t.shotPlayers} players)</span>` : '<span class="muted">—</span>'}</td>
         <td class="num">${t.holebyhole.length ? 'R' + t.holebyhole.join(' R') : '<span class="muted">—</span>'}</td>
         <td class="num">${t.holemaps ? `${t.holemaps}/18` : '<span class="muted">—</span>'}</td>
@@ -109,7 +145,139 @@
         <td>${t.coursestats ? '<span class="ok">✓</span>' : '<span class="muted">—</span>'}</td>
         <td class="num">${fmtBytes(t.bytes)}</td>
         <td class="muted">${fmtWhen(t.at)}</td>
-      </tr>`).join('') || '<tr><td colspan="9" class="muted">nothing cached yet</td></tr>';
+      </tr>`;
+    }
+
+    let stats = null;
+    function renderTable() {
+      const table = $('ctable');
+      table.querySelectorAll('tbody').forEach(b => b.remove());
+      const byYear = new Map();
+      for (const t of stats.tournaments) {
+        const y = t.id.slice(1, 5);
+        if (!byYear.has(y)) byYear.set(y, []);
+        byYear.get(y).push(t);
+      }
+      const years = [...byYear.keys()].sort((a, b) => b - a);
+      if (!years.length) {
+        table.insertAdjacentHTML('beforeend',
+          '<tbody><tr><td colspan="8" class="muted">nothing cached yet</td></tr></tbody>');
+        return;
+      }
+      const html = years.map(y => {
+        const rows = byYear.get(y).slice().sort((a, b) =>
+          (sched.get(a.id)?.i ?? 99) - (sched.get(b.id)?.i ?? 99) || (b.at || 0) - (a.at || 0));
+        const open = openState[y] ?? (y === years[0]);
+        const size = rows.reduce((a, t) => a + t.bytes, 0);
+        return `<tbody class="ygroup${open ? '' : ' closed'}" data-year="${y}">
+          <tr class="yhead"><td colspan="8"><div class="yh">
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+            <span class="yr">${y}</span>
+            <span class="ymeta">${rows.length} tournament${rows.length === 1 ? '' : 's'} · ${fmtBytes(size)}</span>
+            <span class="sp"></span>
+            <button class="btn-ghost ydl" type="button" data-year="${y}">
+              <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8"/><path d="M4.5 7 8 10.5 11.5 7"/><path d="M3 13.5h10"/></svg>
+              download season
+            </button>
+          </div></td></tr>
+          ${rows.map(rowHtml).join('')}
+        </tbody>`;
+      }).join('');
+      table.insertAdjacentHTML('beforeend', html);
+      setBusy(busy);  // keep .ydl buttons disabled if a job is running
+    }
+
+    async function refresh() {
+      stats = await fetch('/api/cachestats').then(r => r.json());
+      const total = stats.tournaments.reduce((a, t) => a + t.bytes, 0);
+      $('astats').innerHTML =
+        `<span>Redis <b class="${stats.redisOk ? 'ok' : 'bad'}">${stats.redisOk ? 'connected' : 'unreachable'}</b></span>
+         <span>SQLite file <b>${fmtBytes(stats.dbBytes)}</b></span>
+         <span>entries <b>${stats.entryCount}</b></span>
+         <span>tournaments <b>${stats.tournaments.length}</b></span>
+         <span>cached payloads <b>${fmtBytes(total)}</b></span>`;
+      await loadNames([...new Set(stats.tournaments.map(t => t.id.slice(1, 5)))]);
+      renderTable();
+    }
+
+    // collapse/expand; the download button inside the header doesn't toggle
+    $('ctable').addEventListener('click', e => {
+      const dl = e.target.closest('.ydl');
+      if (dl) { startBulk(dl.dataset.year); return; }
+      const yh = e.target.closest('tr.yhead');
+      if (!yh) return;
+      const tb = yh.closest('tbody');
+      tb.classList.toggle('closed');
+      openState[tb.dataset.year] = !tb.classList.contains('closed');
+      saveOpen();
+    });
+
+    // --- season download -----------------------------------------------------
+    let busy = false, sawRunning = false, pollTimer = null;
+    function setBusy(b) {
+      busy = b;
+      $('bulkGo').disabled = b;
+      $('bulkStop').hidden = !b;
+      document.querySelectorAll('.ydl').forEach(x => { x.disabled = b; });
+    }
+
+    function showStatus(st) {
+      const m = $('bulkMsg');
+      if (st.running) {
+        const inflight = (st.current || []).join(' · ');
+        const prog = st.total == null ? 'fetching the schedule…'
+          : `${st.done}/${st.total}${inflight ? ' · ' + inflight : ''}`;
+        m.innerHTML = `<span class="fspin"></span>${st.year} · ${prog}`;
+      } else if (st.error) {
+        m.innerHTML = `<span class="bad">${st.error}</span>`;
+      } else if (st.results) {
+        const r = st.results, errs = r.filter(x => x.error).length;
+        const got = r.filter(x => x.fieldRounds || x.stats || x.coursemap).length;
+        m.innerHTML = `${st.year}: ${st.cancelled ? 'stopped at ' : ''}${r.length}` +
+          `${st.total != null && !st.cancelled ? '/' + st.total : ''} events · ` +
+          `${got} with data${st.skipped ? ` · ${st.skipped} skipped (not completed)` : ''}` +
+          (errs ? ` · <span class="bad">${errs} error${errs === 1 ? '' : 's'}</span>` : '');
+      } else {
+        m.textContent = '';
+      }
+    }
+
+    async function pollBulk() {
+      clearTimeout(pollTimer);
+      let st;
+      try { st = await fetch('/api/bulkload').then(r => r.json()); }
+      catch (e) { pollTimer = setTimeout(pollBulk, 3000); return; }
+      showStatus(st);
+      if (st.running) {
+        sawRunning = true;
+        setBusy(true);
+        pollTimer = setTimeout(pollBulk, 1500);
+      } else {
+        setBusy(false);
+        if (sawRunning) {         // a job just finished: pick up what landed
+          sawRunning = false;
+          if (st.year) { openState[st.year] = true; saveOpen(); }
+          refresh();
+        }
+      }
+    }
+
+    async function startBulk(year) {
+      if (busy) return;
+      const r = await fetch(`/api/bulkload?year=${year}`, { method: 'POST' });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        $('bulkMsg').innerHTML = `<span class="bad">${err.detail || r.status}</span>`;
+        return;
+      }
+      $('bulkYear').value = year;
+      pollBulk();
+    }
+    $('bulkGo').addEventListener('click', () => startBulk($('bulkYear').value));
+    $('bulkStop').addEventListener('click', () => fetch('/api/bulkload', { method: 'DELETE' }));
+
+    refresh();
+    pollBulk();   // a job may already be running from another tab
   </script>
 </body>
 </html>

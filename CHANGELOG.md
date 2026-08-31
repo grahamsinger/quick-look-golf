@@ -354,3 +354,34 @@ entry count). Tournament names resolve through the schedule; a "live"
 chip marks short-TTL Redis-only payloads from in-progress play. Backed by
 the new `/api/cachestats`, which rolls the inventory up from the
 structured cache keys without reading any payloads.
+
+## Aug 2026 — season downloads + admin year grouping
+
+- The admin table is **grouped by season into collapsible year sections**
+  (newest open by default; toggles remembered in localStorage). Rows within
+  a season sort in calendar order via the schedule; the per-row Season
+  column is gone.
+- **Download a season**: `POST /api/bulkload?year=` walks every completed
+  event in the year and warms the field-facing caches — hole-by-hole
+  scorecards for each played round (round 1's `currentRound` says how many),
+  the course-stats table, and the aerial assets (course map + 18 hole world
+  files). Shot-level detail stays on-demand (~600 queries/event is the
+  reason). Four tournaments run concurrently, each pacing its own upstream
+  calls; cache hits skip the pause, so re-running a season is a cheap
+  fill-in-the-gaps pass. One job at a time (409 otherwise), `GET` polls
+  progress, `DELETE` cancels after the fetches in flight. The admin page
+  drives it: a season picker + per-year buttons, a live progress line
+  (n/total + the events in flight), stop, and a per-event report; it also
+  picks up a job already running from another tab.
+- Fixed a durability blind spot the season walk exposed: a **mid-round WD
+  in the final round** leaves a permanently partial scorecard with
+  `currentRound == round`, so that round could never pass the
+  holebyhole cache-finality heuristic — it sat on the 30 s TTL forever
+  (the 2025 Sentry's R4 showed up as an eternal "live" chip). The bulk
+  loader only walks completed tournaments, so it now passes
+  `final_hint=True` and pins those rounds durable.
+- **The schedule is cached now** — durable for past seasons (immutable in
+  practice; `refresh=true` busts), 10 min TTL for the current one. Keyed
+  `schedule:{year}:{tour}` so the admin rollup (which groups on R-ids)
+  skips it. This is what makes the admin page's name lookups and the
+  season walk cheap.
