@@ -32,9 +32,18 @@
     .btn-ghost:disabled { opacity: .45; cursor: default; }
     /* .btn-ghost's display beats the UA's [hidden] rule without this */
     [hidden] { display: none !important; }
-    .bulkmsg { display: inline-flex; align-items: center; font-size: 13px; color: var(--ink-2);
-      font-variant-numeric: tabular-nums; }
+    /* the message takes the row's leftover space and ellipsizes — long
+       in-flight name lists must never wrap the bar onto a second line */
+    .bulkmsg { display: inline-flex; align-items: center; flex: 1 1 auto; min-width: 0;
+      font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .bulkmsg .fspin { flex: none; }
+    .bulkmsg .bmtxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .bulkmsg .bad { color: var(--bad); }
+    .bulkmsg .fl { color: var(--warn); }
+    .bulkflags { margin: -8px 2px 16px; font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+    .bulkflags b { color: var(--ink); font-weight: 600; }
+    .bulkflags .fl { color: var(--warn); }
+    .bulkflags .hint { color: var(--ink-3); }
     table.cadmin { border-collapse: collapse; width: 100%; }
     table.cadmin th, table.cadmin td { padding: 7px 13px; border-bottom: 1px solid var(--line);
       font-size: 13px; text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -43,6 +52,10 @@
     table.cadmin td.num, table.cadmin th.num { text-align: right; }
     table.cadmin a { color: var(--pine); text-decoration: none; font-weight: 560; }
     table.cadmin a:hover { text-decoration: underline; }
+    /* long sponsor-era names ("Humana Challenge in partnership with…") must
+       ellipsize, not push the table into a horizontal scroll */
+    table.cadmin td:first-child a { display: inline-block; max-width: 340px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
     .ok { color: var(--good); } .muted { color: var(--ink-3); }
     .livechip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px;
       background: var(--flag-tint); color: var(--flag); font-weight: 640; margin-left: 6px; }
@@ -94,6 +107,7 @@
       <button id="bulkStop" class="btn-ghost" type="button" hidden>Stop</button>
       <span id="bulkMsg" class="bulkmsg"></span>
     </div>
+    <div id="bulkFlags" class="bulkflags" hidden></div>
     <div class="card"><table class="cadmin" id="ctable">
       <thead><tr><th>Tournament</th><th class="num">Player rounds</th>
         <th class="num">Field rounds</th><th class="num">Hole maps</th><th>Course map</th>
@@ -123,13 +137,15 @@
     for (let y = THIS_YEAR; y >= FIRST_SEASON; y--)
       $('bulkYear').insertAdjacentHTML('beforeend', `<option>${y}</option>`);
 
-    // schedule lookups: id -> {name, i} (i = calendar position within the season)
-    const sched = new Map();
+    // schedule lookups: id -> {name, i} (i = calendar position within the
+    // season); each year fetched once — a season's id set never changes
+    const sched = new Map(), namedYears = new Set();
     async function loadNames(years) {
-      await Promise.all(years.map(async y => {
+      await Promise.all(years.filter(y => !namedYears.has(y)).map(async y => {
         try {
           const s = await fetch(`/api/schedule?year=${y}`).then(r => r.json());
           s.tournaments.forEach((t, i) => sched.set(t.id, { name: t.name, i }));
+          namedYears.add(y);
         } catch (e) { /* rows fall back to the raw id */ }
       }));
     }
@@ -137,7 +153,7 @@
     function rowHtml(t) {
       const s = sched.get(t.id);
       return `<tr class="trow">
-        <td><a href="/?t=${t.id}">${s ? s.name : t.id}</a>${t.liveEntries ? '<span class="livechip">live</span>' : ''}</td>
+        <td><a href="/?t=${t.id}" title="${s ? s.name : t.id}">${s ? s.name : t.id}</a>${t.liveEntries ? '<span class="livechip">live</span>' : ''}</td>
         <td class="num">${t.shotRounds ? `${t.shotRounds} <span class="muted">(${t.shotPlayers} players)</span>` : '<span class="muted">—</span>'}</td>
         <td class="num">${t.holebyhole.length ? 'R' + t.holebyhole.join(' R') : '<span class="muted">—</span>'}</td>
         <td class="num">${t.holemaps ? `${t.holemaps}/18` : '<span class="muted">—</span>'}</td>
@@ -222,24 +238,41 @@
     }
 
     function showStatus(st) {
-      const m = $('bulkMsg');
+      const m = $('bulkMsg'), fl = $('bulkFlags');
+      const wrap = h => `<span class="bmtxt">${h}</span>`;
+      fl.hidden = true;
       if (st.running) {
         const inflight = (st.current || []).join(' · ');
         const prog = st.total == null ? 'fetching the schedule…'
           : `${st.done}/${st.total}${inflight ? ' · ' + inflight : ''}`;
-        m.innerHTML = `<span class="fspin"></span>${st.year} · ${prog}`;
+        m.innerHTML = `<span class="fspin"></span>` + wrap(`${st.year} · ${prog}`);
       } else if (st.error) {
-        m.innerHTML = `<span class="bad">${st.error}</span>`;
+        m.innerHTML = wrap(`<span class="bad">${st.error}</span>`);
       } else if (st.results) {
-        const r = st.results, errs = r.filter(x => x.error).length;
-        const got = r.filter(x => x.fieldRounds || x.stats || x.coursemap).length;
-        m.innerHTML = `${st.year}: ${st.cancelled ? 'stopped at ' : ''}${r.length}` +
+        const r = st.results, flagged = r.filter(x => x.flags && x.flags.length);
+        m.innerHTML = wrap(`${st.year}: ${st.cancelled ? 'stopped at ' : ''}${r.length}` +
           `${st.total != null && !st.cancelled ? '/' + st.total : ''} events · ` +
-          `${got} with data${st.skipped ? ` · ${st.skipped} skipped (not completed)` : ''}` +
-          (errs ? ` · <span class="bad">${errs} error${errs === 1 ? '' : 's'}</span>` : '');
+          `${r.length - flagged.length} clean` +
+          `${st.skipped ? ` · ${st.skipped} skipped (not completed)` : ''}` +
+          (flagged.length ? ` · <span class="fl">${flagged.length} flagged ↓</span>` : ''));
+        if (flagged.length) {
+          fl.hidden = false;
+          fl.innerHTML = flagged.map(x =>
+            `<div><b>${x.name}</b> — <span class="fl">${x.flags.join('; ')}</span></div>`).join('') +
+            `<div class="hint">full audit: <code>data/bulkload.log</code></div>`;
+        }
       } else {
         m.textContent = '';
       }
+    }
+
+    // while a job runs, the table itself live-updates too: cachestats is
+    // re-pulled every other poll so rows stream in as events land
+    let refreshing = false, lastTableAt = 0;
+    async function refreshQuiet() {
+      if (refreshing) return;
+      refreshing = true;
+      try { await refresh(); } finally { refreshing = false; }
     }
 
     async function pollBulk() {
@@ -249,15 +282,17 @@
       catch (e) { pollTimer = setTimeout(pollBulk, 3000); return; }
       showStatus(st);
       if (st.running) {
+        if (!sawRunning && st.year) { openState[st.year] = true; saveOpen(); }
         sawRunning = true;
         setBusy(true);
+        if (Date.now() - lastTableAt > 3000) { lastTableAt = Date.now(); refreshQuiet(); }
         pollTimer = setTimeout(pollBulk, 1500);
       } else {
         setBusy(false);
         if (sawRunning) {         // a job just finished: pick up what landed
           sawRunning = false;
           if (st.year) { openState[st.year] = true; saveOpen(); }
-          refresh();
+          refreshQuiet();
         }
       }
     }

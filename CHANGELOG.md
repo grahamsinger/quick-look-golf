@@ -385,3 +385,14 @@ structured cache keys without reading any payloads.
   `schedule:{year}:{tour}` so the admin rollup (which groups on R-ids)
   skips it. This is what makes the admin page's name lookups and the
   season walk cheap.
+- **Every bulk run is audited** to `data/bulkload.log` (its own file, out
+  of uvicorn's noise): per event — rounds fetched vs expected (round 1's
+  `currentRound`), per-round player counts (cut patterns readable at a
+  glance), a data-integrity cross-check (each full scorecard's summed
+  per-hole diff vs the API's own round `toPar` — 0 disagreements across
+  ~19k 2025 cards), stats/aerial coverage, and duration; anomalies get
+  `!!` WARN flags (missing rounds, tiny fields, toPar disagreements,
+  partial aerials, team/match-play events with no individual scorecards)
+  and a per-job summary + flagged recap. The same flags surface on the
+  admin page after each run. Expected absences (no aerials on an old
+  season) aren't flagged — a flag means "look at this one".

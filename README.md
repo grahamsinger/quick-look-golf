@@ -84,9 +84,14 @@ default. Self-hosted Fraunces display serif.
   (newest open; your toggles are remembered) — per tournament: player rounds,
   field rounds, hole-map coverage, course map/stats, size, last capture.
   **Download a season** (top bar, or per year) walks that year's completed
-  events in one paced background pass and grabs each one's field scorecards,
-  course stats, and aerial assets — player shot rounds stay on-demand — with
-  live progress, a stop button, and a per-event report when it finishes.
+  events in one paced background pass (four at a time) and grabs each one's
+  field scorecards, course stats, and aerial assets — player shot rounds stay
+  on-demand — with live progress, a stop button, and a per-event report when
+  it finishes. Every run is **audited to `data/bulkload.log`**: one line per
+  event (rounds fetched vs expected, per-round player counts, a
+  scorecard-vs-API `toPar` cross-check, coverage, timing), `!!` flags on
+  anything anomalous, and a per-job summary; flagged events also surface on
+  the admin page after the run.
 - **Shareable deep links:** the URL carries the selection (`?t=&p=&r=&v=&h=`), so a
   reload restores the view and a **copy-link** button shares it. A freshness bar
   shows **"data current as of … · loaded in N ms · cached/live"** — the timestamp

@@ -92,8 +92,16 @@ Ideas discussed but not built, and things to verify. Shipped work is in
 ## To verify
 - **Historical depth** — `shotDetailsV3` verified back to **2019** (full R4
   card for the 2019 TOUR Championship); the schedule API has seasons back to
-  **2012** (empty before — the season dropdown starts there). How far back
-  shot-level data actually resolves between 2012–2018 is untested.
+  **2012** (empty before — the season dropdown starts there). Shot-level
+  depth between 2012–2018 is still untested, but **field scorecards
+  (`leaderboardHoleByHole`) are now verified back to 2013** via season
+  downloads: regular tour events resolve fully with clean player counts,
+  and every full card passed the toPar cross-check. Known audit-flagged
+  gaps: the **2013 majors have no hole-by-hole data** (all four present
+  from 2014 on); 2014 Zurich / Quicken Loans / Barracuda are missing
+  despite being stroke play; exhibitions and match play (Presidents Cup,
+  Match Play, Tavistock, Grand Slam…) never have individual scorecards.
+  `data/bulkload.log` is the running record as more seasons get pulled.
 
 ## Reminders / gotchas
 - Unofficial API, undocumented, governed by pgatour.com ToS — rate-limit, cache,

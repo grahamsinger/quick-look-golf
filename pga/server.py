@@ -888,6 +888,74 @@ _bulk_lock = threading.Lock()
 _bulk_cancel = threading.Event()
 _bulk: dict[str, Any] = {"running": False}
 
+# Every run is audited to its own file (kept out of server.log's uvicorn
+# noise): one line per event — rounds fetched vs expected, per-round player
+# counts, a scorecard cross-check, stats/aerial coverage, duration — WARN
+# with "!!" flags when something's off, plus a per-job summary. This is the
+# durable record when many seasons get walked; grep '!!' to find anomalies.
+_blog = logging.getLogger("golf.bulk")
+if not _blog.handlers:
+    try:
+        _bh = logging.FileHandler(_DB_PATH.parent / "bulkload.log")
+        _bh.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(message)s"))
+        _blog.addHandler(_bh)
+        _blog.setLevel(logging.INFO)
+        _blog.propagate = False
+    except OSError as _e:
+        _tier_warn("bulk-log", _e)
+
+
+def _to_par_num(s: Any) -> int | None:
+    if s in (None, "", "-"):
+        return None
+    s = str(s).strip()
+    if s.upper() == "E":
+        return 0
+    try:
+        return int(s)  # int("+2") parses
+    except ValueError:
+        return None
+
+
+def _verify_round(data: dict) -> int:
+    """Cross-check each full scorecard: our per-hole diff sum vs the API's
+    own round toPar. Returns the number of cards that disagree — should be
+    zero; anything else means a parsing or upstream-data anomaly."""
+    bad = 0
+    for p in data.get("players") or []:
+        if len(p.get("scores") or []) != 18:
+            continue
+        tp = _to_par_num(p.get("toPar"))
+        if tp is not None and tp != p.get("diff"):
+            bad += 1
+    return bad
+
+
+def _bulk_flags(rec: dict) -> list[str]:
+    """Classify what's anomalous about one event's haul. Expected absences
+    (no aerials on an old season, no data at all before coverage starts)
+    aren't flagged — flags mean 'look at this one'."""
+    flags = []
+    if rec["error"]:
+        flags.append(f"error: {rec['error']}")
+    if rec["fieldRounds"]:
+        exp = rec["expectedRounds"]
+        if exp and rec["fieldRounds"] < exp:
+            flags.append(f"only {rec['fieldRounds']}/{exp} field rounds")
+        if any(n < 2 for n in rec["players"]):
+            flags.append("a round with <2 players")
+        if not rec["stats"]:
+            flags.append("scorecards but no course stats")
+    elif rec["stats"]:
+        flags.append("no individual scorecards (team/match-play format?)")
+    if rec["verifyFails"]:
+        flags.append(f"{rec['verifyFails']} cards disagree with API toPar")
+    if rec["coursemap"] and rec["holemaps"] < 18:
+        flags.append(f"aerials incomplete ({rec['holemaps']}/18 holes)")
+    if _bulk_cancel.is_set():
+        flags.append("stopped mid-event; re-run the season to fill in")
+    return flags
+
 
 def _bulk_pace(cache_hit: bool, pause: float = _BULK_PACE_S) -> None:
     if not cache_hit:
@@ -895,23 +963,34 @@ def _bulk_pace(cache_hit: bool, pause: float = _BULK_PACE_S) -> None:
 
 
 def _bulk_one(tid: str) -> dict:
-    """Warm one tournament's caches; returns what landed."""
-    rec: dict[str, Any] = {"id": tid, "fieldRounds": 0, "stats": False,
-                           "coursemap": False, "holemaps": 0, "error": None}
+    """Warm one tournament's caches; returns what landed + audit fields."""
+    rec: dict[str, Any] = {"id": tid, "fieldRounds": 0, "expectedRounds": None,
+                           "players": [], "verifyFails": 0, "stats": False,
+                           "coursemap": False, "holemaps": 0, "error": None,
+                           "flags": [], "secs": 0.0}
+    t0 = time.monotonic()
     try:
         hit = _cache_get(f"golf:{CACHE_VERSION}:holebyhole:{tid}:1") is not None
         r1 = _holebyhole_round(tid, 1, final_hint=True)
         _bulk_pace(hit)
         if r1.get("available"):
             rec["fieldRounds"] = 1
+            rec["players"].append(len(r1.get("players") or []))
+            rec["verifyFails"] += _verify_round(r1)
             # round 1's currentRound = the last round played, so a 54-hole
             # weather week costs three queries, not four
-            for rnd in range(2, min(r1.get("currentRound") or 4, 4) + 1):
+            rec["expectedRounds"] = min(r1.get("currentRound") or 4, 4)
+            for rnd in range(2, rec["expectedRounds"] + 1):
                 if _bulk_cancel.is_set():
                     return rec
                 hit = _cache_get(f"golf:{CACHE_VERSION}:holebyhole:{tid}:{rnd}") is not None
-                if _holebyhole_round(tid, rnd, final_hint=True).get("available"):
+                rr = _holebyhole_round(tid, rnd, final_hint=True)
+                if rr.get("available"):
                     rec["fieldRounds"] += 1
+                    rec["players"].append(len(rr.get("players") or []))
+                    rec["verifyFails"] += _verify_round(rr)
+                else:
+                    rec["players"].append(0)
                 _bulk_pace(hit)
         resp = Response()
         rec["stats"] = bool(coursestats(resp, tid).get("available"))
@@ -929,6 +1008,10 @@ def _bulk_one(tid: str) -> dict:
                 _bulk_pace(resp.headers.get("X-Cache") == "HIT", _BULK_ASSET_PACE_S)
     except Exception as e:  # noqa: BLE001 — keep walking the season; report it
         rec["error"] = str(e)
+    finally:
+        # in finally so the early cancel returns still get audited
+        rec["secs"] = round(time.monotonic() - t0, 1)
+        rec["flags"] = _bulk_flags(rec)
     return rec
 
 
@@ -939,6 +1022,20 @@ def _bulk_run_one(t: dict) -> None:
         _bulk["current"].append(t["name"])
     rec = _bulk_one(t["id"])
     rec["name"] = t["name"]
+    parts = [f"{rec['id']} {t['name']}:"]
+    if rec["fieldRounds"] or rec["expectedRounds"]:
+        parts.append(f"rounds {rec['fieldRounds']}/{rec['expectedRounds'] or '?'}")
+        parts.append("players " + "/".join(map(str, rec["players"])))
+    else:
+        parts.append("no scorecards")
+    parts.append("stats " + ("y" if rec["stats"] else "n"))
+    parts.append(f"aerials {rec['holemaps']}/18" if rec["coursemap"] else "aerials n")
+    parts.append(f"{rec['secs']}s")
+    line = " ".join(parts)
+    if rec["flags"]:
+        _blog.warning("%s  !! %s", line, "; ".join(rec["flags"]))
+    else:
+        _blog.info(line)
     with _bulk_lock:
         if t["name"] in _bulk["current"]:
             _bulk["current"].remove(t["name"])
@@ -947,15 +1044,19 @@ def _bulk_run_one(t: dict) -> None:
 
 
 def _bulk_worker(year: str) -> None:
+    t0 = time.monotonic()
     try:
         tourns = schedule(Response(), year=year)["tournaments"]
     except Exception as e:  # noqa: BLE001
+        _blog.error("=== %s aborted: schedule fetch failed: %s", year, e)
         with _bulk_lock:
             _bulk.update(running=False, error=f"schedule: {e}", finishedAt=time.time())
         return
     # only completed events: a live week's numbers are still moving, and a
     # future one has nothing to fetch
     todo = [t for t in tourns if t.get("tournamentStatus") == "COMPLETED"]
+    _blog.info("=== %s start: %d completed events (%d skipped, not completed)",
+               year, len(todo), len(tourns) - len(todo))
     with _bulk_lock:
         _bulk.update(total=len(todo), skipped=len(tourns) - len(todo))
     with ThreadPoolExecutor(max_workers=_BULK_WORKERS, thread_name_prefix="bulk") as pool:
@@ -963,6 +1064,15 @@ def _bulk_worker(year: str) -> None:
     with _bulk_lock:
         _bulk["cancelled"] = _bulk_cancel.is_set()
         _bulk.update(running=False, current=[], finishedAt=time.time())
+        results = list(_bulk["results"])
+    flagged = [r for r in results if r["flags"]]
+    _blog.info("=== %s done%s: %d/%d events in %ds · %d clean · %d flagged",
+               year, " (CANCELLED)" if _bulk_cancel.is_set() else "",
+               len(results), len(todo), round(time.monotonic() - t0),
+               len(results) - len(flagged), len(flagged))
+    if flagged:
+        _blog.warning("=== %s flagged: %s", year,
+                      "; ".join(f"{r['name']} ({', '.join(r['flags'])})" for r in flagged))
 
 
 @app.get("/api/bulkload")
