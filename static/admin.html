@@ -16,8 +16,11 @@
   <link rel="stylesheet" href="/css/fairway.css" />
   <link rel="icon" href="/favicon.svg" />
   <style>
-    /* full-bleed: this page outgrows the app shell's 1200px main column */
+    /* full-bleed: this page outgrows the app shell's 1200px main column,
+       and the shared .card is inline-block (shrink-wraps) — block here so
+       the table always spans the window */
     main.admin { padding: 18px 26px 40px; max-width: none; }
+    .admin .card { display: block; }
     .astats { display: flex; gap: 28px; flex-wrap: wrap; margin: 14px 2px 12px; font-size: 13px; color: var(--ink-2); }
     .astats b { color: var(--ink); font-variant-numeric: tabular-nums; }
     .astats .bad { color: var(--bad); }
@@ -77,7 +80,21 @@
       font-size: 15px; color: var(--ink); }
     .yh .ymeta { color: var(--ink-3); font-size: 12px; }
     .yh .sp { flex: 1; }
-    .yh .ydl .ic { width: 13px; height: 13px; }
+    /* per-season status slot: quiet download affordance, or the season's
+       live state (spinner + progress / queued / done summary) */
+    .yslot { flex: none; display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+      max-width: 45%; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .yslot .cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); }
+    .yslot .fspin { margin-right: 0; }
+    .yslot .okc { color: var(--good); } .yslot .flc { color: var(--warn); }
+    .yslot .ydl { display: inline-flex; align-items: center; gap: 6px; border: none; background: none;
+      font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-3); cursor: pointer;
+      padding: 2px 4px; }
+    .yslot .ydl:hover { color: var(--pine); }
+    .yslot .ydl .ic { width: 13px; height: 13px; }
+    .yslot .qx { border: none; background: none; font: inherit; color: var(--ink-3);
+      cursor: pointer; padding: 0 3px; }
+    .yslot .qx:hover { color: var(--bad); }
     @media (prefers-reduced-motion: reduce) { .yh .chev { transition: none; } }
     /* Wide screens: the page is the only scroller, so a long inventory keeps
        its bearings — the column header pins under the topbar and the current
@@ -215,16 +232,12 @@
             <span class="yr">${y}</span>
             <span class="ymeta">${rows.length} tournament${rows.length === 1 ? '' : 's'} · ${fmtBytes(size)}</span>
             <span class="sp"></span>
-            <button class="btn-ghost ydl" type="button" data-year="${y}">
-              <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8"/><path d="M4.5 7 8 10.5 11.5 7"/><path d="M3 13.5h10"/></svg>
-              download season
-            </button>
+            <span class="yslot" data-year="${y}">${yearSlotHtml(y)}</span>
           </div></td></tr>
           ${rows.map(rowHtml).join('')}
         </tbody>`;
       }).join('');
       table.insertAdjacentHTML('beforeend', html);
-      setBusy(busy);  // keep .ydl buttons disabled if a job is running
     }
 
     async function refresh() {
@@ -240,10 +253,40 @@
       renderTable();
     }
 
-    // collapse/expand; the download button inside the header doesn't toggle
+    // each season's header slot renders its download state; patched in place
+    // on every poll so a rebuild isn't needed for a state flip
+    const DL_ICON = '<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8"/><path d="M4.5 7 8 10.5 11.5 7"/><path d="M3 13.5h10"/></svg>';
+    function yearSlotHtml(y) {
+      const st = lastStatus || {};
+      if (st.running && st.year === y) {
+        const cur = (st.current || []).join(' · ');
+        return `<span class="fspin"></span><span>${st.done ?? 0}/${st.total ?? '…'}</span>` +
+          (cur ? `<span class="cur">${cur}</span>` : '');
+      }
+      if ((st.queue || []).includes(y))
+        return `<span>queued</span><button class="qx" type="button" title="remove from queue">✕</button>`;
+      const rep = (st.reports || {})[y];
+      if (rep) {
+        if (rep.error) return `<span class="flc">failed — ${rep.error}</span>`;
+        return `<span class="okc">✓</span><span>${rep.events}/${rep.total}</span>` +
+          (rep.flagged.length ? `<span class="flc">${rep.flagged.length} flagged</span>` : '');
+      }
+      return `<button class="ydl" type="button">${DL_ICON}download</button>`;
+    }
+    function refreshSlots() {
+      document.querySelectorAll('.yslot').forEach(s => { s.innerHTML = yearSlotHtml(s.dataset.year); });
+    }
+
+    // collapse/expand; the status slot inside the header doesn't toggle
     $('ctable').addEventListener('click', e => {
-      const dl = e.target.closest('.ydl');
-      if (dl) { startBulk(dl.dataset.year); return; }
+      const slot = e.target.closest('.yslot');
+      if (slot) {
+        const y = slot.dataset.year;
+        if (e.target.closest('.qx'))
+          fetch(`/api/bulkload?year=${y}`, { method: 'DELETE' }).then(pollBulk);
+        else if (e.target.closest('.ydl')) startBulk(y);
+        return;
+      }
       const yh = e.target.closest('tr.yhead');
       if (!yh) return;
       const tb = yh.closest('tbody');
@@ -252,13 +295,13 @@
       saveOpen();
     });
 
-    // --- season download -----------------------------------------------------
+    // --- season downloads (queued) -------------------------------------------
+    // clicking more seasons while one runs queues them; the server drains the
+    // queue one season at a time and keeps a report per finished year
     let busy = false, sawRunning = false, pollTimer = null;
     function setBusy(b) {
       busy = b;
-      $('bulkGo').disabled = b;
-      $('bulkStop').hidden = !b;
-      document.querySelectorAll('.ydl').forEach(x => { x.disabled = b; });
+      $('bulkStop').hidden = !b;   // download buttons stay live — they enqueue
     }
 
     let lastStatus = null;
@@ -267,34 +310,34 @@
       const m = $('bulkMsg'), fl = $('bulkFlags');
       const wrap = h => `<span class="bmtxt">${h}</span>`;
       fl.hidden = true;
-      // a finished run's report shows only while its season is the one
-      // selected — switch the dropdown to that year to see it again
-      if (!st.running && st.year && st.year !== $('bulkYear').value) {
-        m.textContent = '';
+      const nq = (st.queue || []).length;
+      if (st.running) {
+        // short on purpose — the per-season rows carry the detail
+        const prog = st.total == null ? 'starting…' : `${st.done}/${st.total}`;
+        m.innerHTML = `<span class="fspin"></span>` +
+          wrap(`${st.year} · ${prog}${nq ? ` · ${nq} queued` : ''}`);
         return;
       }
-      if (st.running) {
-        const inflight = (st.current || []).join(' · ');
-        const prog = st.total == null ? 'fetching the schedule…'
-          : `${st.done}/${st.total}${inflight ? ' · ' + inflight : ''}`;
-        m.innerHTML = `<span class="fspin"></span>` + wrap(`${st.year} · ${prog}`);
-      } else if (st.error) {
-        m.innerHTML = wrap(`<span class="bad">${st.error}</span>`);
-      } else if (st.results) {
-        const r = st.results, flagged = r.filter(x => x.flags && x.flags.length);
-        m.innerHTML = wrap(`${st.year}: ${st.cancelled ? 'stopped at ' : ''}${r.length}` +
-          `${st.total != null && !st.cancelled ? '/' + st.total : ''} events · ` +
-          `${r.length - flagged.length} clean` +
-          `${st.skipped ? ` · ${st.skipped} skipped (not completed)` : ''}` +
-          (flagged.length ? ` · <span class="fl">${flagged.length} flagged ↓</span>` : ''));
-        if (flagged.length) {
-          fl.hidden = false;
-          fl.innerHTML = flagged.map(x =>
-            `<div><span class="fyr">${x.id.slice(1, 5)}</span> <b><a href="/?t=${x.id}">${x.name}</a></b> — <span class="fl">${x.flags.join('; ')}</span></div>`).join('') +
-            `<div class="hint">full audit: <code>data/bulkload.log</code></div>`;
-        }
-      } else {
-        m.textContent = '';
+      if (nq) {  // between seasons
+        m.innerHTML = `<span class="fspin"></span>` + wrap(`${nq} queued`);
+        return;
+      }
+      // idle: show the report for the selected season, if one ran this session
+      const rep = (st.reports || {})[$('bulkYear').value];
+      if (!rep) { m.textContent = ''; return; }
+      if (rep.error) {
+        m.innerHTML = wrap(`<span class="bad">${rep.year}: ${rep.error}</span>`);
+        return;
+      }
+      m.innerHTML = wrap(`${rep.year}: ${rep.cancelled ? 'stopped at ' : ''}${rep.events}` +
+        `${rep.cancelled ? '' : '/' + rep.total} events · ${rep.clean} clean` +
+        `${rep.skipped ? ` · ${rep.skipped} skipped (not completed)` : ''}` +
+        (rep.flagged.length ? ` · <span class="fl">${rep.flagged.length} flagged ↓</span>` : ''));
+      if (rep.flagged.length) {
+        fl.hidden = false;
+        fl.innerHTML = rep.flagged.map(x =>
+          `<div><span class="fyr">${x.id.slice(1, 5)}</span> <b><a href="/?t=${x.id}">${x.name}</a></b> — <span class="fl">${x.flags.join('; ')}</span></div>`).join('') +
+          `<div class="hint">full audit: <code>data/bulkload.log</code></div>`;
       }
     }
 
@@ -313,15 +356,18 @@
       try { st = await fetch('/api/bulkload').then(r => r.json()); }
       catch (e) { pollTimer = setTimeout(pollBulk, 3000); return; }
       showStatus(st);
-      if (st.running) {
-        if (!sawRunning && st.year) { openState[st.year] = true; saveOpen(); }
+      refreshSlots();
+      // a drained-queue gap between two seasons still counts as busy
+      const busyNow = st.running || (st.queue || []).length > 0;
+      if (busyNow) {
+        if (st.running && !sawRunning && st.year) { openState[st.year] = true; saveOpen(); }
         sawRunning = true;
         setBusy(true);
         if (Date.now() - lastTableAt > 3000) { lastTableAt = Date.now(); refreshQuiet(); }
         pollTimer = setTimeout(pollBulk, 1500);
       } else {
         setBusy(false);
-        if (sawRunning) {         // a job just finished: pick up what landed
+        if (sawRunning) {         // the queue just drained: pick up what landed
           sawRunning = false;
           if (st.year) { openState[st.year] = true; saveOpen(); }
           refreshQuiet();
@@ -330,7 +376,6 @@
     }
 
     async function startBulk(year) {
-      if (busy) return;
       const r = await fetch(`/api/bulkload?year=${year}`, { method: 'POST' });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
@@ -338,6 +383,7 @@
         return;
       }
       $('bulkYear').value = year;
+      sawRunning = true;
       pollBulk();
     }
     $('bulkGo').addEventListener('click', () => startBulk($('bulkYear').value));

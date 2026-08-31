@@ -1049,7 +1049,30 @@ def _bulk_run_one(t: dict) -> None:
         _bulk["done"] += 1
 
 
-def _bulk_worker(year: str) -> None:
+# Seasons queue up: POST while a run is active appends the year (deduped),
+# and a single dispatcher thread drains the queue one season at a time.
+# Each finished season leaves a trimmed report (counts + flagged events) so
+# the admin page can show any year's audit after the fact; the full detail
+# is in bulkload.log.
+_bulk_queue: list[str] = []
+_bulk_reports: dict[str, dict] = {}
+_bulk_dispatching = False
+
+
+def _bulk_save_report(year: str, results: list[dict], total: int, skipped: int,
+                      cancelled: bool, error: str | None = None) -> None:
+    flagged = [r for r in results if r["flags"]]
+    _bulk_reports[year] = {
+        "year": year, "events": len(results), "total": total, "skipped": skipped,
+        "cancelled": cancelled, "error": error,
+        "clean": len(results) - len(flagged),
+        "flagged": [{"id": r["id"], "name": r.get("name") or r["id"],
+                     "flags": r["flags"]} for r in flagged],
+        "at": time.time(),
+    }
+
+
+def _bulk_run_season(year: str) -> None:
     t0 = time.monotonic()
     try:
         tourns = schedule(Response(), year=year)["tournaments"]
@@ -1057,6 +1080,7 @@ def _bulk_worker(year: str) -> None:
         _blog.error("=== %s aborted: schedule fetch failed: %s", year, e)
         with _bulk_lock:
             _bulk.update(running=False, error=f"schedule: {e}", finishedAt=time.time())
+            _bulk_save_report(year, [], 0, 0, False, error=f"schedule: {e}")
         return
     # only completed events: a live week's numbers are still moving, and a
     # future one has nothing to fetch
@@ -1071,6 +1095,8 @@ def _bulk_worker(year: str) -> None:
         _bulk["cancelled"] = _bulk_cancel.is_set()
         _bulk.update(running=False, current=[], finishedAt=time.time())
         results = list(_bulk["results"])
+        _bulk_save_report(year, results, len(todo), len(tourns) - len(todo),
+                          _bulk["cancelled"])
     flagged = [r for r in results if r["flags"]]
     _blog.info("=== %s done%s: %d/%d events in %ds · %d clean · %d flagged",
                year, " (CANCELLED)" if _bulk_cancel.is_set() else "",
@@ -1082,34 +1108,68 @@ def _bulk_worker(year: str) -> None:
                                 for r in flagged))
 
 
+def _bulk_dispatch() -> None:
+    global _bulk_dispatching
+    while True:
+        with _bulk_lock:
+            if not _bulk_queue:
+                _bulk_dispatching = False
+                return
+            year = _bulk_queue.pop(0)
+            _bulk_cancel.clear()
+            _bulk.clear()
+            _bulk.update(running=True, year=year, total=None, skipped=0, done=0,
+                         current=[], results=[], error=None, cancelled=False,
+                         startedAt=time.time(), finishedAt=None)
+        _bulk_run_season(year)
+
+
 @app.get("/api/bulkload")
 def bulkload_status() -> dict:
-    """Progress of the season download job ({running: false} if none yet)."""
+    """Current run + queued years + per-season reports from this process."""
     with _bulk_lock:
-        return json.loads(json.dumps(_bulk))  # snapshot, not the live dict
+        st = json.loads(json.dumps(_bulk))  # snapshot, not the live dict
+        st["queue"] = list(_bulk_queue)
+        st["reports"] = json.loads(json.dumps(_bulk_reports))
+    return st
 
 
 @app.post("/api/bulkload")
 def bulkload_start(year: str) -> dict:
-    """Kick off a season download (409 if one is already running)."""
+    """Queue a season download (starts immediately when nothing is running).
+    Re-posting a year that's already running or queued is a no-op."""
+    global _bulk_dispatching
     if not (year.isdigit() and 2012 <= int(year) <= time.localtime().tm_year):
         raise HTTPException(400, f"year must be 2012–{time.localtime().tm_year}")
+    start = False
     with _bulk_lock:
-        if _bulk.get("running"):
-            raise HTTPException(409, "a season download is already running")
-        _bulk_cancel.clear()
-        _bulk.clear()
-        _bulk.update(running=True, year=year, total=None, skipped=0, done=0,
-                     current=[], results=[], error=None, cancelled=False,
-                     startedAt=time.time(), finishedAt=None)
-    threading.Thread(target=_bulk_worker, args=(year,), daemon=True).start()
+        already = ((_bulk.get("running") and _bulk.get("year") == year)
+                   or year in _bulk_queue)
+        if not already:
+            _bulk_queue.append(year)
+            if _bulk.get("running"):
+                _blog.info("=== %s queued (behind %s)", year, _bulk.get("year"))
+            if not _bulk_dispatching:
+                _bulk_dispatching = True
+                start = True
+    if start:
+        threading.Thread(target=_bulk_dispatch, daemon=True).start()
     return bulkload_status()
 
 
 @app.delete("/api/bulkload")
-def bulkload_cancel() -> dict:
-    """Ask the running job to stop after the current fetch."""
-    _bulk_cancel.set()
+def bulkload_cancel(year: str | None = None) -> dict:
+    """No year: stop everything — clear the queue and cancel the running
+    season. With year: remove just that season from the queue, or cancel it
+    if it's the one running (the rest of the queue continues)."""
+    with _bulk_lock:
+        if year is None:
+            _bulk_queue.clear()
+            _bulk_cancel.set()
+        elif year in _bulk_queue:
+            _bulk_queue.remove(year)
+        elif _bulk.get("running") and _bulk.get("year") == year:
+            _bulk_cancel.set()
     return bulkload_status()
 
 

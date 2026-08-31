@@ -64,8 +64,9 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   (today it's pick-then-Load, long-standing behavior).
 - **Admin page actions** — the inventory is read-only (the season download
   is the one write path); purge-per-tournament buttons would be a small
-  addition if wanted. A "download everything 2012–now" convenience loop is
-  trivial on top of `/api/bulkload` too.
+  addition if wanted. Seasons queue now, so "download everything 2012–now"
+  is just clicking every year — a single all-of-history button would only
+  save the clicks.
 - **Bulk-download depth** — the season download deliberately skips
   shot-level detail; an opt-in "also fetch shot details for the top N
   finishers" tier is possible if browsing old events' Course view matters.

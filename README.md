@@ -86,8 +86,12 @@ default. Self-hosted Fraunces display serif.
   **Download a season** (top bar, or per year) walks that year's completed
   events in one paced background pass (four at a time) and grabs each one's
   field scorecards, course stats, and aerial assets — player shot rounds stay
-  on-demand — with live progress, a stop button, and a per-event report when
-  it finishes. Every run is **audited to `data/bulkload.log`**: one line per
+  on-demand — with live progress and a stop button. **Seasons queue**: click
+  as many years as you like and they run one after another, each season's
+  header row showing its own state (download / queued ✕ / spinner + progress
+  / ✓ done + flagged count); Stop clears everything, the ✕ dequeues one.
+  Each finished year keeps its report — select that season in the dropdown
+  to review its flags. Every run is **audited to `data/bulkload.log`**: one line per
   event (rounds fetched vs expected, per-round player counts, a
   scorecard-vs-API `toPar` cross-check, coverage, timing), `!!` flags on
   anything anomalous, and a per-job summary; flagged events also surface on

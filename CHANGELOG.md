@@ -411,3 +411,22 @@ structured cache keys without reading any payloads.
   long inventory you always know the year and the columns. Names get a
   wider ellipsis cap on big screens; narrow screens keep the contained
   horizontal scroll.
+
+## Aug 2026 — season download queue
+
+Seasons queue: POST /api/bulkload while a run is active appends the year
+(deduped — re-posting a running or queued season is a no-op), and a
+dispatcher drains the queue one season at a time. DELETE with no year
+stops everything (clears the queue, cancels the run); DELETE ?year=
+surgically removes one queued season or cancels just the running one.
+Every finished season keeps a trimmed report (counts + flagged events)
+for the life of the process, and the admin page shows the flag detail
+for whichever season the dropdown has selected.
+
+The UI moved with it: each season header row carries its own state —
+a quiet "download" affordance, "queued ✕" (the ✕ dequeues it),
+spinner + n/total + the events in flight while running, "✓ 50/50 ·
+2 flagged" once done — so the top bar shrank to picker + Download +
+Stop + a short "2015 · 10/52 · 6 queued". Also fixed: the shared
+.card is inline-block (shrink-wraps), which left the table floating
+in empty paper on wide windows — block on this page.
