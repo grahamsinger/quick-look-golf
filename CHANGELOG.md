@@ -403,3 +403,11 @@ structured cache keys without reading any payloads.
   as holebyhole: its rounds-1-4 finality rule could never fire for
   54-hole weeks or match-play events, so their stats sat on the 30 s
   TTL and the admin inventory flapped by ten rows after every 2013 run.
+- With whole seasons loading, the admin page went **full-bleed with
+  sticky headers**: the layout uses the full window (the app shell's
+  1200px `main` cap is lifted for this page), the page is the only
+  scroller, and on wide screens the column header pins under the topbar
+  with the current season's header pinned just below it — deep in a
+  long inventory you always know the year and the columns. Names get a
+  wider ellipsis cap on big screens; narrow screens keep the contained
+  horizontal scroll.

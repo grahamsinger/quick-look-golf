@@ -16,7 +16,8 @@
   <link rel="stylesheet" href="/css/fairway.css" />
   <link rel="icon" href="/favicon.svg" />
   <style>
-    .admin { padding: 18px 24px 40px; max-width: 1180px; }
+    /* full-bleed: this page outgrows the app shell's 1200px main column */
+    main.admin { padding: 18px 26px 40px; max-width: none; }
     .astats { display: flex; gap: 28px; flex-wrap: wrap; margin: 14px 2px 12px; font-size: 13px; color: var(--ink-2); }
     .astats b { color: var(--ink); font-variant-numeric: tabular-nums; }
     .astats .bad { color: var(--bad); }
@@ -78,6 +79,22 @@
     .yh .sp { flex: 1; }
     .yh .ydl .ic { width: 13px; height: 13px; }
     @media (prefers-reduced-motion: reduce) { .yh .chev { transition: none; } }
+    /* Wide screens: the page is the only scroller, so a long inventory keeps
+       its bearings — the column header pins under the topbar and the current
+       season's header pins just below it (stacked sticky; offsets overlap
+       2px because fractional device pixels leave seams between them). Needs
+       overflow: visible on the card — an overflow ancestor kills viewport
+       sticky — so this block only applies where the table fits (narrow
+       screens keep the card's contained horizontal scroll instead). Must
+       stay AFTER the base rules: equal specificity, cascade order decides. */
+    @media (min-width: 1120px) {
+      .admin .card { overflow: visible; }
+      table.cadmin thead th { position: sticky; top: 65px; z-index: 3; background: var(--card); }
+      tr.yhead td { position: sticky; top: 93px; z-index: 2; }
+    }
+    @media (min-width: 1400px) {
+      table.cadmin td:first-child a { max-width: 560px; }
+    }
   </style>
 </head>
 <body>
