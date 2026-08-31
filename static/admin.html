@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fairway — cache admin</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme') ||
+          (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/fairway.css" />
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    .admin { padding: 18px 24px 40px; max-width: 1180px; }
+    .astats { display: flex; gap: 28px; flex-wrap: wrap; margin: 14px 2px 16px; font-size: 13px; color: var(--ink-2); }
+    .astats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .astats .bad { color: var(--bad); }
+    table.cadmin { border-collapse: collapse; }
+    table.cadmin th, table.cadmin td { padding: 7px 13px; border-bottom: 1px solid var(--line);
+      font-size: 13px; text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    table.cadmin thead th { color: var(--ink-3); font-weight: 700; font-size: 10px;
+      text-transform: uppercase; letter-spacing: .08em; border-bottom: 1.5px solid var(--line-2); }
+    table.cadmin td.num, table.cadmin th.num { text-align: right; }
+    table.cadmin tbody tr:last-child td { border-bottom: none; }
+    table.cadmin a { color: var(--pine); text-decoration: none; font-weight: 560; }
+    table.cadmin a:hover { text-decoration: underline; }
+    table.cadmin .yr { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600; color: var(--ink); }
+    .ok { color: var(--good); } .muted { color: var(--ink-3); }
+    .livechip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px;
+      background: var(--flag-tint); color: var(--flag); font-weight: 640; margin-left: 6px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Fairway — home">
+      <span class="brand-mark">
+        <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <path d="M4 22.5 Q14 18.8 24 22.5" stroke="var(--pine)" stroke-width="1.9" stroke-linecap="round"/>
+          <line x1="9.5" y1="6" x2="9.5" y2="22.2" stroke="var(--pine)" stroke-width="2.1" stroke-linecap="round"/>
+          <path d="M9.5 6 L20.5 8.4 L9.5 10.8 Z" fill="var(--flag)"/>
+          <circle cx="9.5" cy="22.2" r="1.4" fill="var(--pine)"/>
+        </svg>
+      </span>
+      <span class="brand-txt">
+        <span class="wordmark">Fairway</span>
+        <span class="tagline">Cache admin</span>
+      </span>
+    </a>
+    <div class="spacer"></div>
+    <nav class="topnav"><a href="/">← back to the app</a></nav>
+  </header>
+
+  <main class="admin">
+    <div class="summary"><span class="who">What's in the cache</span>
+      <span class="meta">every tournament with data in Redis or SQLite</span></div>
+    <div class="astats" id="astats">loading…</div>
+    <div class="card"><table class="cadmin">
+      <thead><tr><th>Season</th><th>Tournament</th><th class="num">Player rounds</th>
+        <th class="num">Field rounds</th><th class="num">Hole maps</th><th>Course map</th>
+        <th>Stats</th><th class="num">Size</th><th>Last capture</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="9" class="muted">loading…</td></tr></tbody>
+    </table></div>
+    <div class="caphint">Durable entries live in Redis + SQLite (<code>data/cache.sqlite</code>); a
+      <span class="livechip">live</span> marker means the tournament also holds short-TTL Redis-only
+      payloads from in-progress play. Player rounds = cached shot-detail captures (players × rounds).</div>
+  </main>
+
+  <script type="module">
+    const fmtBytes = n => n == null ? '—'
+      : n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + ' MB'
+      : n >= 1024 ? (n / 1024).toFixed(0) + ' KB' : n + ' B';
+    const fmtWhen = ts => ts ? new Date(ts * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+
+    const stats = await fetch('/api/cachestats').then(r => r.json());
+    const total = stats.tournaments.reduce((a, t) => a + t.bytes, 0);
+    document.getElementById('astats').innerHTML =
+      `<span>Redis <b class="${stats.redisOk ? 'ok' : 'bad'}">${stats.redisOk ? 'connected' : 'unreachable'}</b></span>
+       <span>SQLite file <b>${fmtBytes(stats.dbBytes)}</b></span>
+       <span>entries <b>${stats.entryCount}</b></span>
+       <span>tournaments <b>${stats.tournaments.length}</b></span>
+       <span>cached payloads <b>${fmtBytes(total)}</b></span>`;
+
+    // label tournaments via the schedule (usually one or two seasons' worth)
+    const names = new Map();
+    const years = [...new Set(stats.tournaments.map(t => t.id.slice(1, 5)))];
+    await Promise.all(years.map(async y => {
+      try {
+        const s = await fetch(`/api/schedule?year=${y}`).then(r => r.json());
+        s.tournaments.forEach(t => names.set(t.id, t.name));
+      } catch (e) { /* row falls back to the raw id */ }
+    }));
+
+    const rows = stats.tournaments
+      .slice()
+      .sort((a, b) => b.id.slice(1, 5) - a.id.slice(1, 5) || (b.at || 0) - (a.at || 0));
+    document.getElementById('rows').innerHTML = rows.map(t => `
+      <tr>
+        <td class="yr">${t.id.slice(1, 5)}</td>
+        <td><a href="/?t=${t.id}">${names.get(t.id) || t.id}</a>${t.liveEntries ? '<span class="livechip">live</span>' : ''}</td>
+        <td class="num">${t.shotRounds ? `${t.shotRounds} <span class="muted">(${t.shotPlayers} players)</span>` : '<span class="muted">—</span>'}</td>
+        <td class="num">${t.holebyhole.length ? 'R' + t.holebyhole.join(' R') : '<span class="muted">—</span>'}</td>
+        <td class="num">${t.holemaps ? `${t.holemaps}/18` : '<span class="muted">—</span>'}</td>
+        <td>${t.coursemap ? '<span class="ok">✓</span>' : '<span class="muted">—</span>'}</td>
+        <td>${t.coursestats ? '<span class="ok">✓</span>' : '<span class="muted">—</span>'}</td>
+        <td class="num">${fmtBytes(t.bytes)}</td>
+        <td class="muted">${fmtWhen(t.at)}</td>
+      </tr>`).join('') || '<tr><td colspan="9" class="muted">nothing cached yet</td></tr>';
+  </script>
+</body>
+</html>

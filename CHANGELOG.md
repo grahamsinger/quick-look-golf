@@ -343,3 +343,14 @@ The free-text season box became a styled dropdown (same pattern as the
 round combo: hidden select, button, keyboard-navigable menu). Seasons run
 from the current year back to 2012 — the earliest the schedule API has
 data — and the newest season appears automatically each January.
+
+## Aug 2026 — cache admin page
+
+`/admin` (also linked from the topbar as "Cache"): an inventory of both
+cache tiers grouped by tournament — player rounds (shot-detail captures),
+field rounds, hole-map coverage, course map/stats flags, payload size, and
+last capture time, with totals up top (Redis health, SQLite file size,
+entry count). Tournament names resolve through the schedule; a "live"
+chip marks short-TTL Redis-only payloads from in-progress play. Backed by
+the new `/api/cachestats`, which rolls the inventory up from the
+structured cache keys without reading any payloads.

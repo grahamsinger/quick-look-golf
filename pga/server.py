@@ -844,6 +844,85 @@ def holebyhole(response: Response, tournamentId: str, round: int, refresh: bool 
     return data
 
 
+@app.get("/api/cachestats")
+def cachestats() -> dict:
+    """Admin inventory: everything cached, grouped by tournament.
+
+    Scans both tiers — SQLite is the durable record, Redis adds the hot/live
+    entries (a Redis-only entry is a live payload on its 30 s TTL). Keys are
+    structured (kind:tournament:...), so the rollup needs no payload reads.
+    """
+    prefix = f"golf:{CACHE_VERSION}:"
+    entries: dict[str, dict] = {}
+    try:
+        with _disk() as c:
+            for k, n, ts in c.execute("SELECT key, LENGTH(value), created_at FROM cache"):
+                entries[k] = {"size": n, "disk": True, "redis": False, "at": ts}
+    except _DISK_ERRORS as e:
+        _tier_warn("sqlite-scan", e)
+    redis_ok = True
+    try:
+        keys = list(_redis.scan_iter(match=prefix + "*", count=1000))
+        if keys:
+            pipe = _redis.pipeline()
+            for k in keys:
+                pipe.strlen(k)
+            for k, n in zip(keys, pipe.execute()):
+                e = entries.setdefault(k, {"size": 0, "disk": False, "at": None})
+                e["redis"] = True
+                e["size"] = max(e.get("size") or 0, n or 0)
+    except redis.RedisError as e:
+        redis_ok = False
+        _tier_warn("redis-scan", e)
+
+    tourns: dict[str, dict] = {}
+    for k, e in entries.items():
+        parts = k[len(prefix):].split(":")
+        kind, tid = parts[0], parts[1] if len(parts) > 1 else ""
+        if not tid.startswith("R"):
+            continue
+        rec = tourns.setdefault(tid, {
+            "id": tid, "bytes": 0, "diskEntries": 0, "liveEntries": 0, "at": None,
+            "coursemap": False, "coursestats": False, "holemaps": 0,
+            "holebyhole": [], "shotPlayers": set(), "shotRounds": 0,
+        })
+        rec["bytes"] += e["size"]
+        if e["disk"]:
+            rec["diskEntries"] += 1
+        else:
+            rec["liveEntries"] += 1  # Redis-only: a live payload on TTL
+        if e.get("at"):
+            rec["at"] = max(rec["at"] or 0, e["at"])
+        if kind == "coursemap":
+            rec["coursemap"] = True
+        elif kind == "coursestats2":
+            rec["coursestats"] = True
+        elif kind == "holemap":
+            rec["holemaps"] += 1
+        elif kind == "holebyhole" and len(parts) > 2:
+            rec["holebyhole"].append(int(parts[2]))
+        elif kind == "shotdetails" and len(parts) > 3:
+            rec["shotPlayers"].add(parts[2])
+            rec["shotRounds"] += 1
+    out = []
+    for rec in tourns.values():
+        rec["shotPlayers"] = len(rec["shotPlayers"])
+        rec["holebyhole"] = sorted(set(rec["holebyhole"]))
+        out.append(rec)
+    out.sort(key=lambda r: r["id"], reverse=True)
+    try:
+        db_bytes = _DB_PATH.stat().st_size
+    except OSError:
+        db_bytes = None
+    return {"redisOk": redis_ok, "dbBytes": db_bytes, "entryCount": len(entries),
+            "tournaments": out}
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin() -> str:
+    return (STATIC_DIR / "admin.html").read_text()
+
+
 @app.get("/graphiql", response_class=HTMLResponse)
 def graphiql() -> str:
     return (STATIC_DIR / "graphiql.html").read_text()
