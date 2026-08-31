@@ -33,8 +33,11 @@
     /* .btn-ghost's display beats the UA's [hidden] rule without this */
     [hidden] { display: none !important; }
     /* the message takes the row's leftover space and ellipsizes — long
-       in-flight name lists must never wrap the bar onto a second line */
-    .bulkmsg { display: inline-flex; align-items: center; flex: 1 1 auto; min-width: 0;
+       in-flight name lists must never wrap the bar onto a second line.
+       flex-basis must be 0, not auto: the wrap decision uses the item's
+       base size, so a long name list with basis:auto jumped the message
+       onto its own row before shrink/ellipsis ever applied. */
+    .bulkmsg { display: inline-flex; align-items: center; flex: 1 1 0; min-width: 0;
       font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
     .bulkmsg .fspin { flex: none; }
     .bulkmsg .bmtxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
