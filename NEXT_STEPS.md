@@ -43,6 +43,17 @@ Ideas discussed but not built, and things to verify. Shipped work is in
     `scatterData` takes a `course` arg — get courseId from `courseStats`.
   - `holeDetails.statsSummary` (birdie% + rank) could power a hole-difficulty
     strip on the aerial.
+- **Live refresh for the per-player views** — the Field view now has a real
+  ~30 s background cycle (see `scheduleLiveRefresh` in
+  `static/js/views/field.js`) and `loadShots({background})` exists; wiring
+  First putts / Shots / Course to the same pattern during a live round is
+  the natural extension (offered, not yet requested).
+- **Field view follow-ons** — "who made those?" (name the players behind a
+  course-stats cell via `leaderboardHoleByHole`); color a player's scorecard
+  by how the field played each hole that day; auto-load on tournament switch
+  (today it's pick-then-Load, long-standing behavior).
+- **Admin page actions** — `/admin` is read-only by design; purge-per-
+  tournament buttons would be a small addition if wanted.
 - **"Had" for scrambles** — when a player misses the green and chips on, *Had*
   shows the chip distance (in feet), because "the shot that set up the putt" is
   the chip. Optional: separately surface the *approach into the green* distance.
@@ -63,8 +74,10 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   are the natural first targets, with a captured fixture payload.
 
 ## To verify
-- **Historical depth** — how far back `shotDetailsV3` resolves for old seasons is
-  unverified (recent/current events confirmed working).
+- **Historical depth** — `shotDetailsV3` verified back to **2019** (full R4
+  card for the 2019 TOUR Championship); the schedule API has seasons back to
+  **2012** (empty before — the season dropdown starts there). How far back
+  shot-level data actually resolves between 2012–2018 is untested.
 
 ## Reminders / gotchas
 - Unofficial API, undocumented, governed by pgatour.com ToS — rate-limit, cache,
