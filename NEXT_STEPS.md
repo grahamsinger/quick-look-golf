@@ -91,18 +91,19 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   are the natural first targets, with a captured fixture payload.
 
 ## To verify
-- **Historical depth** — `shotDetailsV3` verified back to **2019** (full R4
-  card for the 2019 TOUR Championship); the schedule API has seasons back to
-  **2012** (empty before — the season dropdown starts there). Shot-level
-  depth between 2012–2018 is still untested, but **field scorecards
-  (`leaderboardHoleByHole`) are now verified back to 2013** via season
-  downloads: regular tour events resolve fully with clean player counts,
-  and every full card passed the toPar cross-check. Known audit-flagged
-  gaps: the **2013 majors have no hole-by-hole data** (all four present
-  from 2014 on); 2014 Zurich / Quicken Loans / Barracuda are missing
-  despite being stroke play; exhibitions and match play (Presidents Cup,
-  Match Play, Tavistock, Grand Slam…) never have individual scorecards.
-  `data/bulkload.log` is the running record as more seasons get pulled.
+- **Historical depth — field data now SETTLED**: every season **2012–2026
+  is bulk-loaded** (~750 tournaments, ~90 flagged as expected gaps, full
+  audit in `data/bulkload.log`). `leaderboardHoleByHole` resolves cleanly
+  back to **2012** for regular tour events (clean player counts, zero
+  toPar cross-check failures anywhere). The gaps, per the audit: the
+  **majors have no hole-by-hole in 2012–2013** (all four present from
+  2014 on); Barracuda (stableford) missing 2014–2019 but fine by 2025;
+  Zurich missing 2014 (stroke play then) and from 2017 as a team event;
+  exhibitions and match play (Presidents/Ryder Cup, WGC Match Play,
+  Shootouts, Tavistock…) never have individual scorecards.
+- **Shot-level depth** — `shotDetailsV3` verified back to **2019** (full
+  R4 card for the 2019 TOUR Championship); 2012–2018 per-shot coverage is
+  still untested (field scorecards ≠ shot traces).
 
 ## Reminders / gotchas
 - Unofficial API, undocumented, governed by pgatour.com ToS — rate-limit, cache,
