@@ -336,3 +336,10 @@ localStorage). Hole-click zoom and the stats-row zoom both still work.
   keeps the selection and repaints an open picker), and opening the player
   picker on a live event refreshes the board too (30 s debounce,
   in-progress tournaments only).
+
+## Aug 2026 — season dropdown
+
+The free-text season box became a styled dropdown (same pattern as the
+round combo: hidden select, button, keyboard-navigable menu). Seasons run
+from the current year back to 2012 — the earliest the schedule API has
+data — and the newest season appears automatically each January.

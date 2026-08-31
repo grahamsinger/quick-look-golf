@@ -45,8 +45,15 @@
 
   <div class="toolbar">
     <div class="field">
-      <label for="year">Season</label>
-      <input id="year" value="2026" inputmode="numeric" />
+      <label for="yearBtn">Season</label>
+      <div class="round-combo year-combo">
+        <select id="year" hidden></select>
+        <button type="button" id="yearBtn" class="round-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="yearMenu">
+          <span id="yearBtnLabel">2026</span>
+          <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+        </button>
+        <ul id="yearMenu" class="combo-list round-menu" role="listbox" hidden></ul>
+      </div>
     </div>
     <div class="field combo">
       <label for="tournInput">Tournament</label>

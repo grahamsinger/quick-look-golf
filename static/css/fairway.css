@@ -158,6 +158,8 @@ input:focus, select:focus {
 .pempty { grid-column: 1 / -1; color: var(--ink-3); padding: 6px; }
 /* round picker: custom styled dropdown (matches the tournament combobox) */
 .round-combo { position: relative; min-width: 138px; }
+.year-combo { min-width: 96px; }
+.year-combo .round-menu { max-height: 320px; overflow-y: auto; }
 .round-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
   background: var(--card-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r);
   padding: 9px 12px; height: 40px; font-size: 13.5px; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }

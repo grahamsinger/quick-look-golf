@@ -4,6 +4,7 @@ import { state, maxRound } from './state.js';
 import { initTheme } from './theme.js';
 import { loadShots, copyLink, syncUrl } from './api.js';
 import { setupTournCombo, loadTournaments } from './pickers/tournament.js';
+import { setupYearCombo, syncYearBtn } from './pickers/year.js';
 import { setupRoundCombo, stepRound, updateRoundNav, updateRoundOptions, syncRoundBtn } from './pickers/round.js';
 import { setupPlayerCombo, selectPlayer } from './pickers/player.js';
 import { renderView } from './views/render.js';
@@ -35,7 +36,6 @@ document.querySelectorAll('.segbtn').forEach(btn => btn.addEventListener('click'
   syncUrl();
 }));
 
-$('year').addEventListener('change', () => loadTournaments());
 $('go').addEventListener('click', () => loadShots());
 document.querySelectorAll('.rnav').forEach(b => b.addEventListener('click', () => stepRound(Number(b.dataset.step))));
 $('round').addEventListener('change', updateRoundNav);
@@ -48,6 +48,7 @@ document.addEventListener('click', (e) => {
 // Restore selection from the URL (shared link / reload), then auto-load.
 async function init() {
   initTheme();
+  setupYearCombo();
   setupTournCombo();
   setupRoundCombo();
   setupPlayerCombo();
@@ -60,7 +61,7 @@ async function init() {
     const h = Number(wantH);
     if (h >= 1 && h <= 18) state.courseHole = h;  // deep link straight into a hole zoom
   }
-  if (wantT && /^R\d{7}$/.test(wantT)) $('year').value = wantT.slice(1, 5);
+  if (wantT && /^R\d{7}$/.test(wantT)) { $('year').value = wantT.slice(1, 5); syncYearBtn(); }
   await loadTournaments(wantT);
   if (wantP) selectPlayer(wantP);
   if (wantR && [...$('round').options].some(o => o.value === wantR)) $('round').value = wantR;
