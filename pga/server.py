@@ -650,7 +650,8 @@ def _derive_others(blocks: list[dict]) -> None:
 
 
 @app.get("/api/coursestats")
-def coursestats(response: Response, tournamentId: str, refresh: bool = False) -> dict:
+def coursestats(response: Response, tournamentId: str, refresh: bool = False,
+                finalHint: bool = False) -> dict:
     """Hole-by-hole field scoring for the week (the site's Course Stats tab):
     scoring average, to-par diff, difficulty rank, and per-score counts, with
     an "All Rounds" block plus one block per completed/live round.
@@ -745,10 +746,13 @@ def coursestats(response: Response, tournamentId: str, refresh: bool = False) ->
     out = {"available": bool(courses), "courses": courses}
     if courses:
         # immutable once rounds 1-4 all have a non-live block; otherwise the
-        # numbers still move (live play, or future rounds not yet listed)
+        # numbers still move (live play, or future rounds not yet listed).
+        # That rule can never fire for a 54-hole week or a match-play event
+        # (rounds 1-4 never all appear) — finalHint (the season bulk loader,
+        # which only walks completed tournaments) pins those durable too.
         played = {b["round"] for c in courses for b in c["rounds"] if b["round"]}
         live = any(b["live"] for c in courses for b in c["rounds"])
-        final = played >= {1, 2, 3, 4} and not live
+        final = (played >= {1, 2, 3, 4} or finalHint) and not live
         _cache_set(key, json.dumps(out), ttl=None if final else LIVE_TTL_S)
     response.headers["X-Cache"] = "MISS"
     return out
@@ -995,7 +999,7 @@ def _bulk_one(tid: str) -> dict:
                     rec["players"].append(0)
                 _bulk_pace(hit)
         resp = Response()
-        rec["stats"] = bool(coursestats(resp, tid).get("available"))
+        rec["stats"] = bool(coursestats(resp, tid, finalHint=True).get("available"))
         _bulk_pace(resp.headers.get("X-Cache") == "HIT")
         resp = Response()
         rec["coursemap"] = bool(coursemap(resp, tid).get("available"))
@@ -1074,7 +1078,8 @@ def _bulk_worker(year: str) -> None:
                len(results) - len(flagged), len(flagged))
     if flagged:
         _blog.warning("=== %s flagged: %s", year,
-                      "; ".join(f"{r['name']} ({', '.join(r['flags'])})" for r in flagged))
+                      "; ".join(f"{r['id']} {r['name']} ({', '.join(r['flags'])})"
+                                for r in flagged))
 
 
 @app.get("/api/bulkload")

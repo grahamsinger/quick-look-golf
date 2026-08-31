@@ -42,6 +42,10 @@
     .bulkmsg .fl { color: var(--warn); }
     .bulkflags { margin: -8px 2px 16px; font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
     .bulkflags b { color: var(--ink); font-weight: 600; }
+    .bulkflags .fyr { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 600;
+      color: var(--ink); }
+    .bulkflags a { color: var(--pine); text-decoration: none; }
+    .bulkflags a:hover { text-decoration: underline; }
     .bulkflags .fl { color: var(--warn); }
     .bulkflags .hint { color: var(--ink-3); }
     table.cadmin { border-collapse: collapse; width: 100%; }
@@ -237,10 +241,18 @@
       document.querySelectorAll('.ydl').forEach(x => { x.disabled = b; });
     }
 
+    let lastStatus = null;
     function showStatus(st) {
+      lastStatus = st;
       const m = $('bulkMsg'), fl = $('bulkFlags');
       const wrap = h => `<span class="bmtxt">${h}</span>`;
       fl.hidden = true;
+      // a finished run's report shows only while its season is the one
+      // selected — switch the dropdown to that year to see it again
+      if (!st.running && st.year && st.year !== $('bulkYear').value) {
+        m.textContent = '';
+        return;
+      }
       if (st.running) {
         const inflight = (st.current || []).join(' · ');
         const prog = st.total == null ? 'fetching the schedule…'
@@ -258,7 +270,7 @@
         if (flagged.length) {
           fl.hidden = false;
           fl.innerHTML = flagged.map(x =>
-            `<div><b>${x.name}</b> — <span class="fl">${x.flags.join('; ')}</span></div>`).join('') +
+            `<div><span class="fyr">${x.id.slice(1, 5)}</span> <b><a href="/?t=${x.id}">${x.name}</a></b> — <span class="fl">${x.flags.join('; ')}</span></div>`).join('') +
             `<div class="hint">full audit: <code>data/bulkload.log</code></div>`;
         }
       } else {
@@ -310,6 +322,7 @@
     }
     $('bulkGo').addEventListener('click', () => startBulk($('bulkYear').value));
     $('bulkStop').addEventListener('click', () => fetch('/api/bulkload', { method: 'DELETE' }));
+    $('bulkYear').addEventListener('change', () => { if (lastStatus) showStatus(lastStatus); });
 
     refresh();
     pollBulk();   // a job may already be running from another tab

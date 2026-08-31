@@ -396,3 +396,10 @@ structured cache keys without reading any payloads.
   and a per-job summary + flagged recap. The same flags surface on the
   admin page after each run. Expected absences (no aerials on an old
   season) aren't flagged — a flag means "look at this one".
+- Audit follow-ups: flagged rows carry their **season + a link to the
+  event** (log recap lines carry the full R-id), and the report shows
+  only while its season is selected in the dropdown — switching back to
+  that year brings it back. `coursestats` gained the same `finalHint`
+  as holebyhole: its rounds-1-4 finality rule could never fire for
+  54-hole weeks or match-play events, so their stats sat on the 30 s
+  TTL and the admin inventory flapped by ten rows after every 2013 run.
