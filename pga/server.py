@@ -947,7 +947,9 @@ def _bulk_flags(rec: dict) -> list[str]:
         if not rec["stats"]:
             flags.append("scorecards but no course stats")
     elif rec["stats"]:
-        flags.append("no individual scorecards (team/match-play format?)")
+        # two known causes, indistinguishable here: team/match-play formats
+        # never have per-player cards, and pre-2014 majors aren't covered
+        flags.append("no individual scorecards in the feed")
     if rec["verifyFails"]:
         flags.append(f"{rec['verifyFails']} cards disagree with API toPar")
     if rec["coursemap"] and rec["holemaps"] < 18:
