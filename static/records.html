@@ -23,6 +23,11 @@
     .recbar select { font: inherit; font-size: 13px; color: var(--ink); background: var(--card);
       border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 6px 9px; }
     .recbar .meta { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .rseg { display: inline-flex; background: var(--card-2); border: 1px solid var(--line-2);
+      border-radius: var(--r); padding: 2px; gap: 2px; margin-right: 8px; }
+    .rsegbtn { border: none; background: none; font: inherit; font-size: 12.5px; font-weight: 600;
+      color: var(--ink-2); padding: 5px 13px; border-radius: calc(var(--r) - 3px); cursor: pointer; }
+    .rsegbtn.active { background: var(--card); color: var(--pine); box-shadow: var(--shadow-sm); }
     .rec .summary { margin: 22px 0 10px; }
     .rec .summary .who { font-size: 19px; }
     .recgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
@@ -37,7 +42,7 @@
       vertical-align: middle; font-variant-numeric: tabular-nums; }
     table.rtab tr:last-child td { border-bottom: none; }
     table.rtab td.rk { color: var(--ink-3); font-size: 11px; text-align: right; width: 30px; padding-left: 14px; }
-    table.rtab td.hcell { white-space: nowrap; width: 82px; }
+    table.rtab td.hcell { white-space: nowrap; width: 104px; }
     table.rtab td.hcell b { font-family: var(--serif); font-variation-settings: 'opsz' 40;
       font-weight: 600; font-size: 16px; color: var(--ink); }
     table.rtab td.hcell .par { display: block; font-size: 10.5px; color: var(--ink-3); }
@@ -79,7 +84,11 @@
     <div class="summary"><span class="who">The record book</span>
       <span class="meta" id="scopeMeta">every hole of every scorecard-backed event</span></div>
     <div class="recbar">
-      <label for="recYear">Season</label>
+      <div class="rseg" role="tablist">
+        <button type="button" id="modeWeeks" class="rsegbtn active" role="tab">Single weeks</button>
+        <button type="button" id="modeCourses" class="rsegbtn" role="tab">Across the years</button>
+      </div>
+      <label for="recYear" id="recYearLabel">Season</label>
       <select id="recYear"><option value="">All seasons</option></select>
       <span class="meta" id="recMeta"></span>
     </div>
@@ -96,14 +105,23 @@
     const fmtDiff = d => (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(3);
 
     function rowHtml(e, i, val) {
-      const yds = e.yards ? ` · ${e.yards}y` : '';
-      const rd = e.round ? ` · R${e.round}` : '';
+      // one shape for both modes: a single week's performance links its
+      // event; an across-the-years hole links its latest edition and
+      // carries the body of work underneath
+      const agg = 'editions' in e;
+      const yds = agg
+        ? (e.ymin ? (e.ymin === e.ymax ? ` · ${e.ymax}y` : ` · ${e.ymin}–${e.ymax}y`) : '')
+        : (e.yards ? ` · ${e.yards}y` : '');
+      const tid = agg ? e.latest_tid : e.tournament_id;
+      const label = agg ? (e.course_name || tid)
+        : `${e.year}${e.round ? ` · R${e.round}` : ''} · ${e.name || e.tournament_id}`;
+      const sub = agg ? `${e.editions} editions · ${e.y0}–${e.y1}` : (e.course_name || '');
       return `<tr>
         <td class="rk">${i + 1}</td>
         <td class="hcell"><b>${e.hole}</b><span class="par">par ${e.par}${yds}</span></td>
-        <td class="ev"><a href="/?t=${esc(e.tournament_id)}&v=course&h=${e.hole}"
-            title="${esc(e.name || e.tournament_id)}">${e.year}${rd} · ${esc(e.name || e.tournament_id)}</a>
-          <span class="crs">${esc(e.course_name || '')}</span></td>
+        <td class="ev"><a href="/?t=${esc(tid)}&v=course&h=${e.hole}"
+            title="${esc(label)}">${esc(label)}</a>
+          <span class="crs">${esc(sub)}</span></td>
         <td class="val">${val}</td></tr>`;
     }
     const diffVal = e => `<b class="${e.diff > 0 ? 'over' : 'under'}">${fmtDiff(e.diff)}</b>
@@ -118,34 +136,55 @@
 
     function render(d) {
       const P = { 3: 'Par 3s', 4: 'Par 4s', 5: 'Par 5s' };
-      $('recMeta').textContent = `${d.events} tournaments · ${d.holes} hole performances`;
-      $('scopeMeta').textContent = d.year
-        ? `the ${d.year} season, hole by hole`
-        : `every hole of every scorecard-backed event, 2012 → today`;
+      const agg = d.mode === 'courses';
+      $('recMeta').textContent = agg
+        ? `${d.courses} courses · ${d.holes} holes with 4+ editions`
+        : `${d.events} tournaments · ${d.holes} hole performances`;
+      $('scopeMeta').textContent = agg
+        ? `the same hole, every edition on that course, averaged`
+        : d.year
+          ? `the ${d.year} season, hole by hole`
+          : `every hole of every scorecard-backed event, 2012 → today`;
       $('recBody').className = '';
+      const per = agg ? 'across all editions' : 'per week';
       $('recBody').innerHTML = `
-        <div class="summary"><span class="who">Hardest holes</span><span class="meta">whole-week scoring average vs par</span></div>
+        <div class="summary"><span class="who">Hardest holes</span><span class="meta">${agg ? 'edition-weighted scoring average vs par' : 'whole-week scoring average vs par'}</span></div>
         <div class="recgrid">${[3, 4, 5].map(p => tableCard(P[p], d.hardest[p], diffVal)).join('')}</div>
         <div class="summary"><span class="who">Easiest holes</span><span class="meta">where the field feasted</span></div>
         <div class="recgrid">${[3, 4, 5].map(p => tableCard(P[p], d.easiest[p], diffVal)).join('')}</div>
-        <div class="summary"><span class="who">Trouble &amp; treats</span><span class="meta">share of the field per week</span></div>
+        <div class="summary"><span class="who">Trouble &amp; treats</span><span class="meta">share of the field ${per}</span></div>
         <div class="recgrid two">
           ${tableCard('Double bogey or worse', d.doubles, e => pctVal(e, e.dblPct, e.doubles + e.others, 'over'))}
           ${tableCard('Birdie or better', d.birdies, e => pctVal(e, e.birPct, e.eagles + e.birdies, 'under'))}
-        </div>
+        </div>` + (agg ? '' : `
         <div class="summary"><span class="who">Hardest single rounds</span><span class="meta">one hole, one day</span></div>
-        <div class="recgrid two">${tableCard('Carnage', d.rounds, diffVal)}<div></div></div>`;
+        <div class="recgrid two">${tableCard('Carnage', d.rounds, diffVal)}<div></div></div>`);
+    }
+
+    let mode = 'weeks';
+    function setMode(m) {
+      mode = m;
+      $('modeWeeks').classList.toggle('active', m === 'weeks');
+      $('modeCourses').classList.toggle('active', m === 'courses');
+      // aggregation is inherently all-time — the season filter steps aside
+      const hideYear = m === 'courses';
+      $('recYear').hidden = hideYear;
+      $('recYearLabel').hidden = hideYear;
+      load();
     }
 
     async function load() {
-      const y = $('recYear').value;
-      const d = await fetch(`/api/records${y ? `?year=${y}` : ''}`).then(r => r.json());
-      if (!$('recYear').options.length || $('recYear').options.length === 1) {
+      const y = mode === 'weeks' ? $('recYear').value : '';
+      const qs = mode === 'courses' ? '?mode=courses' : (y ? `?year=${y}` : '');
+      const d = await fetch(`/api/records${qs}`).then(r => r.json());
+      if ($('recYear').options.length === 1) {
         d.years.forEach(yr => $('recYear').insertAdjacentHTML('beforeend', `<option>${yr}</option>`));
       }
       render(d);
     }
     $('recYear').addEventListener('change', load);
+    $('modeWeeks').addEventListener('click', () => setMode('weeks'));
+    $('modeCourses').addEventListener('click', () => setMode('courses'));
     load();
   </script>
 </body>

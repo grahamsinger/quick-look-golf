@@ -17,13 +17,14 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   feel too generous or stingy over time.
 
 ## Possible improvements
-- **Record book follow-ons** — v1 ranks single-edition performances; an
-  **aggregated-holes view** (the same hole across editions: Sawgrass 17
-  averaged over 12 years, `GROUP BY course_id, hole`, min N editions) is
-  the natural sequel, plus toughest-courses and a "your favorites' worst
-  holes" cut. Also: the Course view's stats table comes from courseStats,
-  which is EMPTY before 2023 — it could fall back to the same
-  scorecard-derived numbers the record book uses (yardage skeletons
+- **Record book follow-ons** — single weeks + across-the-years both
+  shipped; still open: toughest-courses (course-level aggregates), a
+  "your favorites' worst holes" cut, and merging split course identities
+  (the API re-registered e.g. Quail Hollow around its 2017 renovation, so
+  its 18th shows as two lineages — arguably honest, but a name-based
+  merge option exists). Also: the Course view's stats table comes from
+  courseStats, which is EMPTY before 2023 — it could fall back to the
+  same scorecard-derived numbers the record book uses (yardage skeletons
   exist all the way back).
 - **Non-standard formats need support** (surfaced by the 2025 season
   download; today they just show "—" for field rounds): the **Ryder Cup**

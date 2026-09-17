@@ -1081,10 +1081,16 @@ _REC_MIN_ROUND = 30
 
 
 @app.get("/api/records")
-def records(year: int | None = None, limit: int = 10) -> dict:
+def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> dict:
     """The Records page bundle: hardest/easiest holes by par, double+ and
-    birdie rates, hardest single rounds — all-time or one season."""
+    birdie rates, hardest single rounds — all-time or one season. With
+    mode=courses, the across-the-years aggregation instead."""
     limit = max(1, min(limit, 50))
+    with _stats_db() as c:
+        if c.execute("SELECT 1 FROM hole_stats LIMIT 1").fetchone() is None:
+            _records_rebuild()  # first hit on a fresh file: derive in place
+    if mode == "courses":
+        return _records_courses(limit)
     yw = "AND year = ?" if year is not None else ""
     ya: tuple = (year,) if year is not None else ()
 
@@ -1100,8 +1106,6 @@ def records(year: int | None = None, limit: int = 10) -> dict:
             return out
 
     with _stats_db() as c:
-        if c.execute("SELECT 1 FROM hole_stats LIMIT 1").fetchone() is None:
-            _records_rebuild()  # first hit on a fresh file: derive in place
         years = [r[0] for r in c.execute(
             "SELECT DISTINCT year FROM hole_stats ORDER BY year DESC")]
         n_events, n_holes = c.execute(
@@ -1128,6 +1132,62 @@ def records(year: int | None = None, limit: int = 10) -> dict:
     out["rounds"] = pick(
         f"SELECT * FROM hole_stats WHERE round > 0 AND players >= {_REC_MIN_ROUND} {yw} "
         f"ORDER BY diff DESC, players DESC LIMIT ?", ya + (limit,))
+    return out
+
+
+# a hole needs a body of work before it can hold an all-years record
+_REC_MIN_EDITIONS = 4
+
+
+def _records_courses(limit: int) -> dict:
+    """The across-the-years bundle: the same hole aggregated over every
+    edition played on that course. Grouped by (course, hole, par) — a
+    re-pared hole gets separate lives, not a blended average — with
+    averages weighted by each edition's player-rounds. The deep link goes
+    to the latest edition (lexical MAX of the R-ids sorts by year)."""
+    def q(parw: str, order: str) -> str:
+        return (
+            "SELECT course_id, MAX(course_name) AS course_name, hole, par,"
+            " MIN(yards) AS ymin, MAX(yards) AS ymax,"
+            " COUNT(*) AS editions, MIN(year) AS y0, MAX(year) AS y1,"
+            " SUM(players) AS players,"
+            " ROUND(SUM(avg * players) * 1.0 / SUM(players), 3) AS avg,"
+            " ROUND(SUM(diff * players) * 1.0 / SUM(players), 3) AS diff,"
+            " SUM(eagles) AS eagles, SUM(birdies) AS birdies, SUM(pars) AS pars,"
+            " SUM(bogeys) AS bogeys, SUM(doubles) AS doubles, SUM(others) AS others,"
+            " MAX(tournament_id) AS latest_tid"
+            f" FROM hole_stats WHERE round = 0 AND players >= {_REC_MIN_WEEK}"
+            f" AND course_id != '' {parw}"
+            f" GROUP BY course_id, hole, par HAVING COUNT(*) >= {_REC_MIN_EDITIONS}"
+            f" ORDER BY {order} LIMIT ?")
+
+    def pick(sql: str, args: tuple) -> list[dict]:
+        with _stats_db() as c:
+            out = []
+            for r in c.execute(sql, args):
+                d = dict(r)
+                if d.get("players"):
+                    d["dblPct"] = round(100 * ((d["doubles"] or 0) + (d["others"] or 0)) / d["players"], 1)
+                    d["birPct"] = round(100 * ((d["eagles"] or 0) + (d["birdies"] or 0)) / d["players"], 1)
+                out.append(d)
+            return out
+
+    with _stats_db() as c:
+        n_holes, n_courses = c.execute(
+            f"SELECT COUNT(*), COUNT(DISTINCT course_id) FROM ({q('', '1')[:-8]})"
+        ).fetchone()
+        years = [r[0] for r in c.execute(
+            "SELECT DISTINCT year FROM hole_stats ORDER BY year DESC")]
+    out: dict[str, Any] = {"mode": "courses", "years": years,
+                           "courses": n_courses, "holes": n_holes,
+                           "hardest": {}, "easiest": {}}
+    for par in (3, 4, 5):
+        out["hardest"][par] = pick(q("AND par = ?", "diff DESC, players DESC"), (par, limit))
+        out["easiest"][par] = pick(q("AND par = ?", "diff ASC, players DESC"), (par, limit))
+    out["doubles"] = pick(
+        q("", "(SUM(doubles) + SUM(others)) * 1.0 / SUM(players) DESC"), (limit,))
+    out["birdies"] = pick(
+        q("", "(SUM(eagles) + SUM(birdies)) * 1.0 / SUM(players) DESC"), (limit,))
     return out
 
 

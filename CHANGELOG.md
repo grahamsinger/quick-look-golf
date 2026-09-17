@@ -474,3 +474,19 @@ cards); only COMPLETED tournaments join; difficulty = avg − par. Rate
 lists carry credibility floors (100+ player-rounds weekly, 30+ single
 round). `POST /api/records/rebuild` re-derives (~3 s for all 15 seasons);
 each bulk season download tops up its year automatically.
+
+## Sep 2026 — records across the years
+
+The record book grew a second lens: **"Across the years"** (a toggle
+beside "Single weeks") aggregates the same hole over every edition
+played on its course — hardest/easiest by par and the double+/birdie
+rates, averaged with each edition weighted by its player-rounds, minimum
+four editions, the season filter stepping aside (aggregation is
+inherently all-time). Grouped by (course, hole, par) so a re-pared hole
+keeps separate lives; yardage shows as a range when tees moved between
+editions; each entry deep-links to the hole's latest edition. Served by
+`/api/records?mode=courses`. The lists read like an almanac: Muirfield
+Village's 16th over 15 editions, Augusta's 4th, Doral's Blue Monster
+18th as both hardest par 4 and top double+ factory, Kapalua's 5th /
+Riviera's 1st / Waialae's 9th ruling the birdie lists — and exactly one
+par 5 in the dataset plays over par across editions (Sheshan's 8th).
