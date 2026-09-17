@@ -547,3 +547,16 @@ count the same cards.
   and a retry button. Real team/match-play support (team race chart,
   match-play brackets — the schema has the types) is logged in
   NEXT_STEPS as its own project.
+
+## Sep 2026 — record rows that actually fit
+
+Nearly every record row was ellipsizing. Three fixes: **editorial short
+names** for display (sponsor tails like "presented by …" stripped,
+"World Golf Championships-" → "WGC", venue suffixes and "the " dropped —
+the official name stays in the hover title); the three-up grid drops to
+**two-up under 1650px** (three narrow columns truncated everything at
+ordinary window sizes); and the cryptic "435 pr" became **"435 rounds"**
+("players" on the single-round Carnage list), with the value column
+widened to fit and the footer rewritten in plain words. From 556 clipped
+names out of 900 at 1512px to 7 (the truly marathon titles, which keep
+tooltips).

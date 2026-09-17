@@ -32,6 +32,8 @@
     .rec .summary .who { font-size: 19px; }
     .recgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
     .recgrid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* three-up needs real width; drop to two-up before rows get cramped */
+    @media (max-width: 1650px) { .recgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 1050px) { .recgrid, .recgrid.two { grid-template-columns: 1fr; } }
     .card .chead { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
       color: var(--ink-3); padding: 8px 14px 7px; border-bottom: 1.5px solid var(--line-2); }
@@ -54,7 +56,7 @@
     table.rtab td.ev a:hover { text-decoration: underline; }
     table.rtab td.ev .crs { display: block; font-size: 11px; color: var(--ink-3);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    table.rtab td.val { text-align: right; white-space: nowrap; width: 108px; padding-right: 14px; }
+    table.rtab td.val { text-align: right; white-space: nowrap; width: 138px; padding-right: 14px; }
     table.rtab td.val b { font-size: 13.5px; }
     table.rtab td.val .sub { display: block; font-size: 11px; color: var(--ink-3); }
     .over { color: var(--bad); } .under { color: var(--good); }
@@ -107,8 +109,9 @@
     </div>
     <div id="recBody" class="recload"><span class="fspin"></span>compiling the record book…</div>
     <div class="caphint">Counted from the field scorecards (2012 onward; team and match-play weeks have
-      none, so they sit this out). <b>pr</b> = player-rounds behind the number; weekly lists need 100+,
-      single-round lists 30+. Click any record to open that hole over its aerial.</div>
+      none, so they sit this out). The count beside each average is how many rounds were played on that
+      hole — weekly lists need 100+, single-round lists 30+ to qualify. Click any record to open that
+      hole over its aerial.</div>
   </main>
 
   <script type="module">
@@ -116,6 +119,21 @@
     const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const fmtDiff = d => (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(3);
+
+    // the feed's official titles are sponsor-bloated ("the Memorial
+    // Tournament presented by Workday") — display an editorial short form
+    // and keep the full name in the hover title
+    const shortEvent = n => (n || '')
+      .replace(/ presented by .*$/i, '')
+      .replace(/ in partnership with .*$/i, '')
+      .replace(/ at .*$/, '')
+      .replace(' Resort & Club', '')
+      .replace(/^ISPS Handa /i, '')
+      .replace(/^the /, '')
+      .replace(/World Golf Championships-/, 'WGC ');
+    const shortCourse = n => (n || '')
+      .replace(' Golf Club', ' GC').replace(' Country Club', ' CC')
+      .replace(/ Golf Course$/, '').replace(/ Course$/, '');
 
     function rowHtml(e, i, val) {
       // one shape for both modes: a single week's performance links its
@@ -126,19 +144,22 @@
         ? (e.ymin ? (e.ymin === e.ymax ? ` · ${e.ymax}y` : ` · ${e.ymin}–${e.ymax}y`) : '')
         : (e.yards ? ` · ${e.yards}y` : '');
       const tid = agg ? e.latest_tid : e.tournament_id;
-      const label = agg ? (e.course_name || tid)
-        : `${e.year}${e.round ? ` · R${e.round}` : ''} · ${e.name || e.tournament_id}`;
-      const sub = agg ? `${e.editions} editions · ${e.y0}–${e.y1}` : (e.course_name || '');
+      const rd = e.round ? ` · R${e.round}` : '';
+      const label = agg ? (shortCourse(e.course_name) || tid)
+        : `${e.year}${rd} · ${shortEvent(e.name) || e.tournament_id}`;
+      const full = agg ? (e.course_name || tid)
+        : `${e.year}${rd} · ${e.name || e.tournament_id}${e.course_name ? ` — ${e.course_name}` : ''}`;
+      const sub = agg ? `${e.editions} editions · ${e.y0}–${e.y1}` : shortCourse(e.course_name);
       return `<tr>
         <td class="rk">${i + 1}</td>
         <td class="hcell"><b>${e.hole}</b><span class="par">par ${e.par}${yds}</span></td>
         <td class="ev"><a href="/?t=${esc(tid)}&v=course&h=${e.hole}"
-            title="${esc(label)}">${esc(label)}</a>
+            title="${esc(full)}">${esc(label)}</a>
           <span class="crs">${esc(sub)}</span></td>
         <td class="val">${val}</td></tr>`;
     }
     const diffVal = e => `<b class="${e.diff > 0 ? 'over' : 'under'}">${fmtDiff(e.diff)}</b>
-      <span class="sub">avg ${e.avg.toFixed(2)} · ${e.players} pr</span>`;
+      <span class="sub">avg ${e.avg.toFixed(2)} · ${e.players} ${e.round ? 'players' : 'rounds'}</span>`;
     const pctVal = (e, pct, n, cls) => `<b class="${cls}">${pct}%</b>
       <span class="sub">${n} of ${e.players}</span>`;
 
