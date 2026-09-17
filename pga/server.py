@@ -933,6 +933,204 @@ def teetimes(response: Response, tournamentId: str, refresh: bool = False,
     return out
 
 
+# --- records: cross-tournament hole stats -----------------------------------
+# Cross-event questions ("hardest par 3 since 2012") need queryable rows,
+# not per-event JSON blobs — this derives data/stats.sqlite (its own file:
+# cache.sqlite stays a purgeable cache, this is a rebuildable mart — both
+# disposable). One row per hole per round per event; round 0 = the whole
+# week. The source is the cached FIELD SCORECARDS, not courseStats:
+# courseStats has no numbers before 2023 (older payloads are par/yards
+# skeletons with "-" averages), while the scorecards run to 2012 and were
+# toPar-verified by the bulk audit — every bucket and average is counted
+# from them directly (diff ≤ −2 eagles … ≥ +3 others). courseStats only
+# contributes yardage + course names. Team/match-play formats have no
+# individual scorecards, so they exclude themselves; only COMPLETED
+# tournaments join (a live week's "all rounds" would be a partial week).
+_STATS_DB = _DB_PATH.parent / "stats.sqlite"
+
+
+def _stats_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(_STATS_DB, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+try:
+    with _stats_db() as _c:
+        _c.execute(
+            "CREATE TABLE IF NOT EXISTS hole_stats ("
+            " tournament_id TEXT NOT NULL, year INTEGER NOT NULL, name TEXT,"
+            " course_id TEXT NOT NULL DEFAULT '', course_name TEXT,"
+            " round INTEGER NOT NULL, hole INTEGER NOT NULL,"
+            " par INTEGER, yards INTEGER, avg REAL, diff REAL, rank INTEGER,"
+            " eagles INTEGER, birdies INTEGER, pars INTEGER, bogeys INTEGER,"
+            " doubles INTEGER, others INTEGER, players INTEGER,"
+            " PRIMARY KEY (tournament_id, course_id, round, hole))"
+        )
+        _c.execute("CREATE INDEX IF NOT EXISTS idx_hs_year ON hole_stats(year)")
+        _c.execute("CREATE INDEX IF NOT EXISTS idx_hs_par ON hole_stats(par, round)")
+except _DISK_ERRORS as _e:
+    _tier_warn("stats-init", _e)
+
+
+def _records_rebuild(year: int | None = None) -> dict:
+    """Re-derive hole_stats from the cached scorecards (no API traffic
+    beyond cached-schedule name lookups). Idempotent; scoped to one year or
+    the whole set. A live event's rounds aren't counted until the schedule
+    marks it COMPLETED, so it joins on the next pass after it ends."""
+    with _disk() as c:
+        hbh = c.execute("SELECT key, value FROM cache WHERE key LIKE ?",
+                        (f"golf:{CACHE_VERSION}:holebyhole:%",)).fetchall()
+        cstats = dict(c.execute("SELECT key, value FROM cache WHERE key LIKE ?",
+                                (f"golf:{CACHE_VERSION}:coursestats2:%",)))
+    by_tid: dict[str, list[tuple[int, str]]] = {}
+    for key, value in hbh:
+        parts = key.split(":")
+        tid = parts[3]
+        try:
+            y, rnd = int(tid[1:5]), int(parts[4])
+        except ValueError:
+            continue
+        if year is not None and y != year:
+            continue
+        by_tid.setdefault(tid, []).append((rnd, value))
+    names: dict[str, str] = {}
+    completed: set[str] = set()
+    for y in sorted({int(t[1:5]) for t in by_tid}):
+        try:
+            for t in schedule(Response(), year=str(y))["tournaments"]:
+                names[t["id"]] = t["name"]
+                if t.get("tournamentStatus") == "COMPLETED":
+                    completed.add(t["id"])
+        except Exception as e:  # noqa: BLE001 — names/status are per-year
+            _log.warning("records: schedule for %s failed: %s", y, e)
+    rows: list[tuple] = []
+    events = 0
+    for tid, rnds in by_tid.items():
+        if tid not in completed:
+            continue
+        y = int(tid[1:5])
+        # yardage + course names come from the coursestats blob — a skeleton
+        # with both exists even where the API has no scoring numbers
+        yards: dict[tuple[str, int], int] = {}
+        cnames: dict[str, str] = {}
+        blob = cstats.get(f"golf:{CACHE_VERSION}:coursestats2:{tid}")
+        if blob:
+            for cr in json.loads(blob).get("courses") or []:
+                cid = cr.get("courseId") or ""
+                cnames[cid] = cr.get("courseName")
+                for blk in cr.get("rounds") or []:
+                    if blk.get("round"):
+                        continue  # the All Rounds block's yardage is canonical
+                    for r in blk.get("rows") or []:
+                        try:
+                            yards[(cid, int(r.get("hole")))] = int(r.get("yards"))
+                        except (TypeError, ValueError):
+                            pass
+        # (courseId, round, hole) -> [n, strokes, eagles..others, par];
+        # round 0 accumulates the whole week alongside the per-round keys
+        acc: dict[tuple[str, int, int], list] = {}
+
+        def bump(k: tuple[str, int, int], s: int, par: int) -> None:
+            a = acc.setdefault(k, [0, 0, 0, 0, 0, 0, 0, 0, par])
+            a[0] += 1
+            a[1] += s
+            d = s - par
+            a[2 + (0 if d <= -2 else 1 if d == -1 else 2 if d == 0
+                   else 3 if d == 1 else 4 if d == 2 else 5)] += 1
+
+        for rnd, value in rnds:
+            data = json.loads(value)
+            if not data.get("available"):
+                continue
+            for p in data.get("players") or []:
+                cid = p.get("courseId") or ""
+                for s in p.get("scores") or []:
+                    bump((cid, rnd, s["h"]), s["s"], s["par"])
+                    bump((cid, 0, s["h"]), s["s"], s["par"])
+        if not acc:
+            continue
+        events += 1
+        for (cid, rnd, hole), a in acc.items():
+            avg = round(a[1] / a[0], 3)
+            rows.append((tid, y, names.get(tid), cid, cnames.get(cid),
+                         rnd, hole, a[8], yards.get((cid, hole)), avg,
+                         round(avg - a[8], 3), None,
+                         a[2], a[3], a[4], a[5], a[6], a[7], a[0]))
+    with _stats_db() as c:
+        if year is None:
+            c.execute("DELETE FROM hole_stats")
+        else:
+            c.execute("DELETE FROM hole_stats WHERE year = ?", (year,))
+        c.executemany(
+            "INSERT OR REPLACE INTO hole_stats VALUES "
+            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    return {"events": events, "rows": len(rows)}
+
+
+@app.post("/api/records/rebuild")
+def records_rebuild(year: int | None = None) -> dict:
+    return _records_rebuild(year)
+
+
+# leaderboard credibility floors: rates need a real field behind them —
+# player-rounds for a week (a 30-man TOUR Championship week is ~120), a
+# single round's field for the per-round list (Hero's 20 stays out)
+_REC_MIN_WEEK = 100
+_REC_MIN_ROUND = 30
+
+
+@app.get("/api/records")
+def records(year: int | None = None, limit: int = 10) -> dict:
+    """The Records page bundle: hardest/easiest holes by par, double+ and
+    birdie rates, hardest single rounds — all-time or one season."""
+    limit = max(1, min(limit, 50))
+    yw = "AND year = ?" if year is not None else ""
+    ya: tuple = (year,) if year is not None else ()
+
+    def pick(sql: str, args: tuple) -> list[dict]:
+        with _stats_db() as c:
+            out = []
+            for r in c.execute(sql, args):
+                d = dict(r)
+                if d.get("players"):
+                    d["dblPct"] = round(100 * ((d["doubles"] or 0) + (d["others"] or 0)) / d["players"], 1)
+                    d["birPct"] = round(100 * ((d["eagles"] or 0) + (d["birdies"] or 0)) / d["players"], 1)
+                out.append(d)
+            return out
+
+    with _stats_db() as c:
+        if c.execute("SELECT 1 FROM hole_stats LIMIT 1").fetchone() is None:
+            _records_rebuild()  # first hit on a fresh file: derive in place
+        years = [r[0] for r in c.execute(
+            "SELECT DISTINCT year FROM hole_stats ORDER BY year DESC")]
+        n_events, n_holes = c.execute(
+            f"SELECT COUNT(DISTINCT tournament_id), COUNT(*) FROM hole_stats "
+            f"WHERE round = 0 {yw}", ya).fetchone()
+
+    week = (f"SELECT * FROM hole_stats WHERE round = 0 AND players >= {_REC_MIN_WEEK} {yw}")
+    out: dict[str, Any] = {"year": year, "years": years,
+                           "events": n_events, "holes": n_holes,
+                           "hardest": {}, "easiest": {}}
+    for par in (3, 4, 5):
+        out["hardest"][par] = pick(
+            f"{week} AND par = ? ORDER BY diff DESC, players DESC LIMIT ?",
+            ya + (par, limit))
+        out["easiest"][par] = pick(
+            f"{week} AND par = ? ORDER BY diff ASC, players DESC LIMIT ?",
+            ya + (par, limit))
+    out["doubles"] = pick(
+        f"{week} AND others IS NOT NULL "
+        f"ORDER BY (doubles + others) * 1.0 / players DESC LIMIT ?", ya + (limit,))
+    out["birdies"] = pick(
+        f"{week} ORDER BY (eagles + birdies) * 1.0 / players DESC LIMIT ?",
+        ya + (limit,))
+    out["rounds"] = pick(
+        f"SELECT * FROM hole_stats WHERE round > 0 AND players >= {_REC_MIN_ROUND} {yw} "
+        f"ORDER BY diff DESC, players DESC LIMIT ?", ya + (limit,))
+    return out
+
+
 # --- season bulk download ---------------------------------------------------
 # One background job at a time walks a season's completed tournaments and
 # warms the field-facing caches: hole-by-hole scorecards for every played
@@ -1167,6 +1365,12 @@ def _bulk_run_season(year: str) -> None:
         _blog.warning("=== %s flagged: %s", year,
                       "; ".join(f"{r['id']} {r['name']} ({', '.join(r['flags'])})"
                                 for r in flagged))
+    try:  # fold the fresh season into the records mart
+        rc = _records_rebuild(int(year))
+        _blog.info("=== %s records: %d events -> %d hole rows",
+                   year, rc["events"], rc["rows"])
+    except Exception as e:  # noqa: BLE001 — the mart is rebuildable, never fatal
+        _blog.warning("=== %s records rebuild failed: %s", year, e)
 
 
 def _bulk_dispatch() -> None:
@@ -1311,6 +1515,11 @@ def cachestats() -> dict:
 @app.get("/admin", response_class=HTMLResponse)
 def admin() -> str:
     return (STATIC_DIR / "admin.html").read_text()
+
+
+@app.get("/records", response_class=HTMLResponse)
+def records_page() -> str:
+    return (STATIC_DIR / "records.html").read_text()
 
 
 @app.get("/graphiql", response_class=HTMLResponse)

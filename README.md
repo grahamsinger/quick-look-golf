@@ -83,6 +83,13 @@ default. Self-hosted Fraunces display serif.
   select that player everywhere; the ★ on a row (hover) **pins a favorite
   to the top**, remembered across tournaments. During live play, players
   yet to tee off hold their leaderboard spot with their tee time.
+- **The record book** (`/records`, the "Records" link in the topbar):
+  cross-tournament hole records over everything loaded — hardest and easiest
+  holes by par, double+ and birdie-or-better rates, hardest single rounds —
+  all-time or one season, every entry deep-linking into that hole's aerial.
+  Derived entirely from the cached field scorecards into `data/stats.sqlite`
+  (a rebuildable mart; each season download tops up its year), because
+  the API's own courseStats has no numbers before 2023.
 - **Cache admin** (`/admin`, the "Cache" link in the topbar): an inventory of
   everything cached, **grouped by season into collapsible year sections**
   (newest open; your toggles are remembered) — per tournament: player rounds,

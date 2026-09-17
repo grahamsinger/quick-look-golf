@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fairway — records</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme') ||
+          (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/fairway.css" />
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    main.rec { padding: 18px 26px 46px; max-width: 1280px; }
+    .rec .card { display: block; padding: 4px 0 2px; }
+    .recbar { display: flex; align-items: center; gap: 10px; margin: 14px 2px 4px; }
+    .recbar label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+    .recbar select { font: inherit; font-size: 13px; color: var(--ink); background: var(--card);
+      border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 6px 9px; }
+    .recbar .meta { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .rec .summary { margin: 22px 0 10px; }
+    .rec .summary .who { font-size: 19px; }
+    .recgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .recgrid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 1050px) { .recgrid, .recgrid.two { grid-template-columns: 1fr; } }
+    .card .chead { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--ink-3); padding: 8px 14px 7px; border-bottom: 1.5px solid var(--line-2); }
+    /* fixed layout so the event column truncates with an ellipsis instead
+       of pushing the table past the card edge */
+    table.rtab { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    table.rtab td { padding: 6px 9px; border-bottom: 1px solid var(--line); font-size: 13px;
+      vertical-align: middle; font-variant-numeric: tabular-nums; }
+    table.rtab tr:last-child td { border-bottom: none; }
+    table.rtab td.rk { color: var(--ink-3); font-size: 11px; text-align: right; width: 30px; padding-left: 14px; }
+    table.rtab td.hcell { white-space: nowrap; width: 82px; }
+    table.rtab td.hcell b { font-family: var(--serif); font-variation-settings: 'opsz' 40;
+      font-weight: 600; font-size: 16px; color: var(--ink); }
+    table.rtab td.hcell .par { display: block; font-size: 10.5px; color: var(--ink-3); }
+    table.rtab td.ev { min-width: 0; }
+    table.rtab td.ev a { color: var(--pine); text-decoration: none; font-weight: 560;
+      display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    table.rtab td.ev a:hover { text-decoration: underline; }
+    table.rtab td.ev .crs { display: block; font-size: 11px; color: var(--ink-3);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    table.rtab td.val { text-align: right; white-space: nowrap; width: 108px; padding-right: 14px; }
+    table.rtab td.val b { font-size: 13.5px; }
+    table.rtab td.val .sub { display: block; font-size: 11px; color: var(--ink-3); }
+    .over { color: var(--bad); } .under { color: var(--good); }
+    .rec .caphint { margin-top: 16px; }
+    .recload { color: var(--ink-3); font-size: 13px; margin: 24px 2px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Fairway — home">
+      <span class="brand-mark">
+        <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <path d="M4 22.5 Q14 18.8 24 22.5" stroke="var(--pine)" stroke-width="1.9" stroke-linecap="round"/>
+          <line x1="9.5" y1="6" x2="9.5" y2="22.2" stroke="var(--pine)" stroke-width="2.1" stroke-linecap="round"/>
+          <path d="M9.5 6 L20.5 8.4 L9.5 10.8 Z" fill="var(--flag)"/>
+          <circle cx="9.5" cy="22.2" r="1.4" fill="var(--pine)"/>
+        </svg>
+      </span>
+      <span class="brand-txt">
+        <span class="wordmark">Fairway</span>
+        <span class="tagline">Records</span>
+      </span>
+    </a>
+    <div class="spacer"></div>
+    <nav class="topnav"><a href="/">← back to the app</a></nav>
+  </header>
+
+  <main class="rec">
+    <div class="summary"><span class="who">The record book</span>
+      <span class="meta" id="scopeMeta">every hole of every scorecard-backed event</span></div>
+    <div class="recbar">
+      <label for="recYear">Season</label>
+      <select id="recYear"><option value="">All seasons</option></select>
+      <span class="meta" id="recMeta"></span>
+    </div>
+    <div id="recBody" class="recload"><span class="fspin"></span>compiling the record book…</div>
+    <div class="caphint">Counted from the field scorecards (2012 onward; team and match-play weeks have
+      none, so they sit this out). <b>pr</b> = player-rounds behind the number; weekly lists need 100+,
+      single-round lists 30+. Click any record to open that hole over its aerial.</div>
+  </main>
+
+  <script type="module">
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const fmtDiff = d => (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(3);
+
+    function rowHtml(e, i, val) {
+      const yds = e.yards ? ` · ${e.yards}y` : '';
+      const rd = e.round ? ` · R${e.round}` : '';
+      return `<tr>
+        <td class="rk">${i + 1}</td>
+        <td class="hcell"><b>${e.hole}</b><span class="par">par ${e.par}${yds}</span></td>
+        <td class="ev"><a href="/?t=${esc(e.tournament_id)}&v=course&h=${e.hole}"
+            title="${esc(e.name || e.tournament_id)}">${e.year}${rd} · ${esc(e.name || e.tournament_id)}</a>
+          <span class="crs">${esc(e.course_name || '')}</span></td>
+        <td class="val">${val}</td></tr>`;
+    }
+    const diffVal = e => `<b class="${e.diff > 0 ? 'over' : 'under'}">${fmtDiff(e.diff)}</b>
+      <span class="sub">avg ${e.avg.toFixed(2)} · ${e.players} pr</span>`;
+    const pctVal = (e, pct, n, cls) => `<b class="${cls}">${pct}%</b>
+      <span class="sub">${n} of ${e.players}</span>`;
+
+    const tableCard = (head, list, val) => `<div class="card">
+      <div class="chead">${head}</div>
+      <table class="rtab">${list.map((e, i) => rowHtml(e, i, val(e))).join('')
+        || '<tr><td class="rk"></td><td>nothing yet</td></tr>'}</table></div>`;
+
+    function render(d) {
+      const P = { 3: 'Par 3s', 4: 'Par 4s', 5: 'Par 5s' };
+      $('recMeta').textContent = `${d.events} tournaments · ${d.holes} hole performances`;
+      $('scopeMeta').textContent = d.year
+        ? `the ${d.year} season, hole by hole`
+        : `every hole of every scorecard-backed event, 2012 → today`;
+      $('recBody').className = '';
+      $('recBody').innerHTML = `
+        <div class="summary"><span class="who">Hardest holes</span><span class="meta">whole-week scoring average vs par</span></div>
+        <div class="recgrid">${[3, 4, 5].map(p => tableCard(P[p], d.hardest[p], diffVal)).join('')}</div>
+        <div class="summary"><span class="who">Easiest holes</span><span class="meta">where the field feasted</span></div>
+        <div class="recgrid">${[3, 4, 5].map(p => tableCard(P[p], d.easiest[p], diffVal)).join('')}</div>
+        <div class="summary"><span class="who">Trouble &amp; treats</span><span class="meta">share of the field per week</span></div>
+        <div class="recgrid two">
+          ${tableCard('Double bogey or worse', d.doubles, e => pctVal(e, e.dblPct, e.doubles + e.others, 'over'))}
+          ${tableCard('Birdie or better', d.birdies, e => pctVal(e, e.birPct, e.eagles + e.birdies, 'under'))}
+        </div>
+        <div class="summary"><span class="who">Hardest single rounds</span><span class="meta">one hole, one day</span></div>
+        <div class="recgrid two">${tableCard('Carnage', d.rounds, diffVal)}<div></div></div>`;
+    }
+
+    async function load() {
+      const y = $('recYear').value;
+      const d = await fetch(`/api/records${y ? `?year=${y}` : ''}`).then(r => r.json());
+      if (!$('recYear').options.length || $('recYear').options.length === 1) {
+        d.years.forEach(yr => $('recYear').insertAdjacentHTML('beforeend', `<option>${yr}</option>`));
+      }
+      render(d);
+    }
+    $('recYear').addEventListener('change', load);
+    load();
+  </script>
+</body>
+</html>

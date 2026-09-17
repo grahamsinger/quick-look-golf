@@ -454,3 +454,23 @@ round**, labeled "Round N · thru X" — the old only-complete-cards rule
 meant a round-1 click expanded nothing at all for anyone still on the
 course (raw strokes complement the live row's running totals; only a
 round the player hasn't started stays out).
+
+## Sep 2026 — the record book
+
+`/records` ("Records" in the topbar): cross-tournament hole records over
+the whole loaded dataset — hardest and easiest holes by par, double+ and
+birdie-or-better rates, hardest single rounds — all-time or filtered to
+one season, every entry deep-linking into that hole's aerial. Backed by
+`data/stats.sqlite` (a rebuildable mart, separate file so the cache stays
+purgeable): one row per hole per round per event, derived ENTIRELY from
+the cached field scorecards — no new API traffic. Key discovery forcing
+that design: **courseStats has no numbers before 2023** (older payloads
+are par/yards skeletons with "-" averages; the bulk audit's "stats y"
+only saw the skeleton), while the scorecards run to 2012 and were
+toPar-verified — so buckets (eagle…double, triples+ as ≥+3) and averages
+are counted from the cards directly, with courseStats contributing only
+yardage and course names. Team/match-play weeks exclude themselves (no
+cards); only COMPLETED tournaments join; difficulty = avg − par. Rate
+lists carry credibility floors (100+ player-rounds weekly, 30+ single
+round). `POST /api/records/rebuild` re-derives (~3 s for all 15 seasons);
+each bulk season download tops up its year automatically.
