@@ -39,6 +39,30 @@ function getField(tid, rnd) {
   return cur && cur.res ? cur.res : null;
 }
 
+// starting tees, per tournament: {"1": {playerId: startTee}} — drives the
+// play-order running scores and the start-hole marks. Refreshed lazily (a
+// weather week can re-tee, and later rounds appear as pairings release);
+// unavailable (pre-2013) means cells fall back to hole order, unmarked.
+const teesCache = new Map();
+function getTees(tid) {
+  const e = teesCache.get(tid);
+  if (e === undefined || (!e.pending && Date.now() - e.ts > 300000)) {
+    teesCache.set(tid, { ...(e || {}), pending: true });
+    api(`/api/teetimes?tournamentId=${encodeURIComponent(tid)}`)
+      .then(res => {
+        teesCache.set(tid, { res, ts: Date.now() });
+        if (state.view === 'field') renderField();
+      })
+      .catch(() => teesCache.set(tid, { res: { available: false }, ts: Date.now() }));
+  }
+  const cur = teesCache.get(tid);
+  return cur && cur.res && cur.res.available ? cur.res.rounds : null;
+}
+
+// the order a round was actually played: from the starting tee to 18, then
+// wrapping 1 onward (a PGA round is always a single loop of the course)
+const playOrder = st => Array.from({ length: 18 }, (_, i) => (((st || 1) - 1 + i) % 18) + 1);
+
 // favorite players: their rows pin to the top of the grid. Stored once for
 // the app (player ids are stable), so favorites follow you across weeks.
 const FAV_LS = 'fairway-fav-players';
@@ -105,27 +129,36 @@ export function renderField() {
     return;
   }
 
+  const tees = getTees(tid);
+  const startOf = pid => (tees && tees[String(rnd)] && tees[String(rnd)][pid]) || 0;
+
   // one row per player, ordered by current standing (running total for
-  // players on the course, leaderboard total for those yet to start)
+  // players on the course, leaderboard total for those yet to start).
+  // Cells stay in hole-column order, but the running total accumulates in
+  // the order the player actually took the course — a 10-tee start runs
+  // 10→18 then 1→9, so each cell is their score when they FINISHED it.
   const rows = started.map(p => {
     const by = new Map(p.scores.map(s => [s.h, s]));
+    const st = startOf(p.id);
     let run = p.start;
-    let cells = '';
-    for (let h = 1; h <= 18; h++) {
+    const byHole = [];
+    for (const h of playOrder(st)) {
       const s = by.get(h);
-      if (!s) { cells += '<td class="fcell"></td>'; continue; }
+      if (!s) continue;
       const diff = s.s - s.par;
       run += diff;
-      cells += `<td class="fcell${cellCls(diff)}">${fmtPar(run)}</td>`;
+      byHole[h] = `<td class="fcell${cellCls(diff)}${st === h ? ' fc-first' : ''}">${fmtPar(run)}</td>`;
     }
+    let cells = '';
+    for (let h = 1; h <= 18; h++) cells += byHole[h] || '<td class="fcell"></td>';
     const toParCls = p.diff < 0 ? 'rg-good' : p.diff > 0 ? 'rg-bad' : '';
     const strokes = p.total && p.total !== '-' ? p.total : '';  // "-" until the round is done
     const rd = `${esc(strokes)} <b class="${toParCls}">${fmtPar(p.diff)}</b>`;
-    return { id: p.id, cells, end: run, rd };
+    return { id: p.id, cells, end: run, rd, st };
   }).concat(waiting.map(p => {
     const tt = teeTimeStr(p.teeTime);
     const cells = `<td class="fcell fteecell" colspan="18">${tt ? `tees off ${esc(tt)}` : ''}</td>`;
-    return { id: p.id, cells, end: parseTot(p.total || ''), rd: '', wait: true };
+    return { id: p.id, cells, end: parseTot(p.total || ''), rd: '', wait: true, st: startOf(p.id) };
   }));
   rows.sort((a, b) => a.end - b.end
     || (lbIdx.get(a.id) ?? 1e9) - (lbIdx.get(b.id) ?? 1e9));
@@ -169,15 +202,17 @@ export function renderField() {
       }
       const p = rd.available && rd.players.find(x => x.id === expandedPid);
       if (!p) continue;
+      const st = (tees && tees[String(r)] && tees[String(r)][expandedPid]) || 0;
       const by = new Map(p.scores.map(s => [s.h, s]));
       let cells = '';
       for (let h = 1; h <= 18; h++) {
         const s = by.get(h);
-        cells += s ? `<td class="fcell${cellCls(s.s - s.par)}">${s.s}</td>` : '<td class="fcell"></td>';
+        cells += s ? `<td class="fcell${cellCls(s.s - s.par)}${st === h ? ' fc-first' : ''}">${s.s}</td>` : '<td class="fcell"></td>';
       }
       const strokes = p.total && p.total !== '-' ? p.total : '';
       const cum = p.start + p.diff;
-      parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>${cells}
+      const mark = st > 1 ? `<span class="ftee10" title="starting hole: ${st}">*</span>` : '';
+      parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}${mark}</td>${cells}
         <td class="frd">${esc(strokes)} <b class="${sgnCls(p.diff)}">${fmtPar(p.diff)}</b></td>
         <td class="ftot"><b class="${sgnCls(cum)}">${fmtPar(cum)}</b></td></tr>`);
     }
@@ -197,8 +232,10 @@ export function renderField() {
       <svg viewBox="0 0 16 16"><path d="M8 1.9l1.85 3.75 4.15.6-3 2.93.7 4.12L8 11.35l-3.7 1.95.7-4.12-3-2.93 4.15-.6z"/></svg></button>`;
     const totCls = r.end < 0 ? 'rg-good' : r.end > 0 ? 'rg-bad' : '';
     const tot = Number.isFinite(r.end) ? fmtPar(r.end) : '';
+    // the classic scorer's asterisk: this player's round starts on the back
+    const mark = r.st > 1 ? `<span class="ftee10" title="starting hole: ${r.st}">*</span>` : '';
     return `<tr class="frow${r.wait ? ' fwait' : ''}${r.id === selId ? ' fsel' : ''}${favEnd}" data-pid="${esc(r.id)}">
-      <td class="fpos">${r.pos}</td><td class="fname">${star}${esc(name)}</td>${r.cells}
+      <td class="fpos">${r.pos}</td><td class="fname">${star}${esc(name)}${mark}</td>${r.cells}
       <td class="frd">${r.rd}</td><td class="ftot"><b class="${totCls}">${tot}</b></td></tr>${r.id === expandedPid ? expHtml : ''}`;
   }).join('');
 
@@ -211,6 +248,7 @@ export function renderField() {
     `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
      <div class="caphint">Each cell = cumulative <b>tournament</b> score to par through that hole · color = the score on that hole
        (<span class="fkey fc-eag">eagle+</span> <span class="fkey fc-bir">birdie</span> <span class="fkey fc-bog">bogey</span> <span class="fkey fc-dbl">double+</span>)
+       · scores run in the order played: corner mark = the starting hole (<span class="ftee10">*</span> by a name = started on 10)
        · click a row to open that player's round-by-round scorecards (and select them) · ★ pins favorites to the top${waitHint}</div>
      <div class="card fieldcard"><div class="fieldwrap"><table class="fieldgrid">
        <thead><tr><th class="fpos"></th><th class="fname">Player</th>

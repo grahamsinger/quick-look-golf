@@ -440,6 +440,20 @@ table.fieldgrid .fparrow .fpos, table.fieldgrid .fparrow .fname { z-index: 4; }
 .frow.fsel .fpos, .frow.fsel .fname { background: var(--turf); }
 .frow.fsel .fpos { box-shadow: inset 3px 0 0 var(--pine); }
 .frow.fsel .fname { font-weight: 700; color: var(--pine); }
+/* the player's starting hole: a small wedge tucked in the cell's corner.
+   currentColor at half strength stays quiet but visible on every fill —
+   light on the saturated eagle/double cells, ink on tints and plain paper
+   (bolding the number and a full ring both failed exactly there). */
+table.fieldgrid td.fc-first { position: relative; }
+table.fieldgrid td.fc-first::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 0; height: 0;
+  border: 5px solid transparent;
+  border-top-color: currentColor; border-left-color: currentColor;
+  opacity: .5;
+}
+/* the scorer's asterisk next to a name: started on the back nine */
+.ftee10 { color: var(--ink-3); font-weight: 700; margin-left: 3px; cursor: default; }
+.caphint .ftee10 { margin-left: 0; }
 /* cell fill = the score on that hole (the number is the running total) */
 .fc-eag { background: var(--fairway); color: #F4EFE2; }
 .fc-bir { background: var(--tint-good-2); }

@@ -430,3 +430,21 @@ spinner + n/total + the events in flight while running, "✓ 50/50 ·
 Stop + a short "2015 · 10/52 · 6 queued". Also fixed: the shared
 .card is inline-block (shrink-wraps), which left the table floating
 in empty paper on wide windows — block on this page.
+
+## Sep 2026 — Field view: scores run in the order played
+
+The race chart's running totals now follow the order each player actually
+took the course: a 10-tee start accumulates 10→18 then 1→9, so every cell
+is the player's tournament score when they FINISHED that hole (before, a
+back-nine starter's early columns silently assumed holes 1–9 came first).
+The starting hole gets a small corner mark in the cell (a bold number and
+a full ring both died on the saturated eagle/double fills — a half-opacity
+currentColor wedge reads on every background), and back-nine starters
+carry the scorer's classic * next to their name, in the main grid and the
+expanded round rows. Backed by new `/api/teetimes` over `teeTimesV2`
+(per-round {playerId: startTee} maps; durable once every round is
+official or on the bulk loader's finalHint; nothing before ~2013 — the
+chart falls back to hole order, unmarked). The bulk loader warms it per
+event and audits it ("tees y/n"). Notable dead end for the record:
+`HoleScore.sequenceNumber` is the display column index (OUT = 9), NOT
+play order.

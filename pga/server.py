@@ -876,6 +876,63 @@ def holebyhole(response: Response, tournamentId: str, round: int, refresh: bool 
     return data
 
 
+_TEES_Q = """
+query Tees($id: ID!) {
+  teeTimesV2(id: $id) {
+    rounds {
+      roundInt roundStatus
+      groups { startTee players { id } }
+    }
+  }
+}
+"""
+
+
+@app.get("/api/teetimes")
+def teetimes(response: Response, tournamentId: str, refresh: bool = False,
+             finalHint: bool = False) -> dict:
+    """Per-round starting tees for the field: {rounds: {"1": {playerId: tee}}}.
+
+    Backs the Field view's play-order running scores and start-hole markers
+    (leaderboardHoleByHole is hole-ordered and its sequenceNumber is just the
+    display column, so the start has to come from the pairings). Durable once
+    every listed round is COMPLETE/OFFICIAL — or on the bulk loader's word —
+    otherwise the live TTL (tee times shift on weather weeks). The query has
+    nothing before ~2013; that returns {available: false}, uncached, and the
+    client falls back to hole order.
+    """
+    key = f"golf:{CACHE_VERSION}:teetimes:{tournamentId}"
+    if refresh:
+        _cache_del(key)
+    else:
+        cached = _cache_get(key)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            return json.loads(cached)
+    try:
+        data = client.query(_TEES_Q, {"id": tournamentId}, "Tees").get("teeTimesV2")
+    except GraphQLError:
+        data = None
+    rounds: dict[str, dict[str, int]] = {}
+    done = True
+    for r in (data or {}).get("rounds") or []:
+        m: dict[str, int] = {}
+        for g in r.get("groups") or []:
+            tee = g.get("startTee")
+            for p in g.get("players") or []:
+                if p.get("id") and tee:
+                    m[p["id"]] = tee
+        if m:
+            rounds[str(r.get("roundInt"))] = m
+        if r.get("roundStatus") not in ("COMPLETE", "OFFICIAL"):
+            done = False
+    out = {"available": bool(rounds), "rounds": rounds}
+    if rounds:
+        _cache_set(key, json.dumps(out), ttl=None if (done or finalHint) else LIVE_TTL_S)
+    response.headers["X-Cache"] = "MISS"
+    return out
+
+
 # --- season bulk download ---------------------------------------------------
 # One background job at a time walks a season's completed tournaments and
 # warms the field-facing caches: hole-by-hole scorecards for every played
@@ -972,8 +1029,8 @@ def _bulk_one(tid: str) -> dict:
     """Warm one tournament's caches; returns what landed + audit fields."""
     rec: dict[str, Any] = {"id": tid, "fieldRounds": 0, "expectedRounds": None,
                            "players": [], "verifyFails": 0, "stats": False,
-                           "coursemap": False, "holemaps": 0, "error": None,
-                           "flags": [], "secs": 0.0}
+                           "teeTimes": False, "coursemap": False, "holemaps": 0,
+                           "error": None, "flags": [], "secs": 0.0}
     t0 = time.monotonic()
     try:
         hit = _cache_get(f"golf:{CACHE_VERSION}:holebyhole:{tid}:1") is not None
@@ -1000,6 +1057,9 @@ def _bulk_one(tid: str) -> dict:
                 _bulk_pace(hit)
         resp = Response()
         rec["stats"] = bool(coursestats(resp, tid, finalHint=True).get("available"))
+        _bulk_pace(resp.headers.get("X-Cache") == "HIT")
+        resp = Response()
+        rec["teeTimes"] = bool(teetimes(resp, tid, finalHint=True).get("available"))
         _bulk_pace(resp.headers.get("X-Cache") == "HIT")
         resp = Response()
         rec["coursemap"] = bool(coursemap(resp, tid).get("available"))
@@ -1035,6 +1095,7 @@ def _bulk_run_one(t: dict) -> None:
     else:
         parts.append("no scorecards")
     parts.append("stats " + ("y" if rec["stats"] else "n"))
+    parts.append("tees " + ("y" if rec["teeTimes"] else "n"))
     parts.append(f"aerials {rec['holemaps']}/18" if rec["coursemap"] else "aerials n")
     parts.append(f"{rec['secs']}s")
     line = " ".join(parts)

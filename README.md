@@ -75,7 +75,11 @@ default. Self-hosted Fraunces display serif.
   rows = players (ordered by where they stood when the round ended), columns =
   holes; each cell is the player's cumulative tournament score to par through
   that hole, colored by what they scored on it (eagle+/birdie/bogey/double+),
-  with a par row, Rd/Tot columns, and tie-aware positions. Click a row to
+  with a par row, Rd/Tot columns, and tie-aware positions. **Scores run in
+  the order actually played**: on split-tee days a 10-starter's total
+  accumulates 10→18 then 1→9, their starting hole carries a small corner
+  mark, and the scorer's classic * sits by the name (pairings via
+  `/api/teetimes`; pre-2013 events fall back to hole order). Click a row to
   select that player everywhere; the ★ on a row (hover) **pins a favorite
   to the top**, remembered across tournaments. During live play, players
   yet to tee off hold their leaderboard spot with their tee time.
