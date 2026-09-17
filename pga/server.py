@@ -649,6 +649,128 @@ def _derive_others(blocks: list[dict]) -> None:
             _fill_others(blk, agg)
 
 
+def _cs_is_skeleton(payload: dict) -> bool:
+    """True when courseStats came back as the pre-2023 shell: holes and
+    yardages listed, but no scoring number on any hole row."""
+    for cr in payload.get("courses") or []:
+        for blk in cr.get("rounds") or []:
+            for r in blk.get("rows") or []:
+                if r.get("hole"):
+                    try:
+                        float(r.get("avg"))
+                        return False
+                    except (TypeError, ValueError):
+                        pass
+    return bool(payload.get("available"))
+
+
+def _fmt_cs_diff(d: float) -> str:
+    return "E" if abs(d) < 5e-4 else f"{d:+.3f}"
+
+
+def _cs_fill_from_scorecards(tid: str, payload: dict) -> bool:
+    """Fill a skeleton courseStats payload from the field scorecards — the
+    same counting the record book uses — producing per-round + All Rounds
+    blocks with averages, diffs, ranks, buckets and T+, in the shapes the
+    Course view already renders. Read-through: an event never opened
+    before fetches its rounds once, cached like any Field-view visit.
+    Returns True when numbers landed (skeletons only exist for completed
+    pre-2023 events, so a successful fill is final data)."""
+    r1 = _holebyhole_round(tid, 1)
+    if not r1.get("available"):
+        return False
+    rounds_data = {1: r1}
+    for r in range(2, min(r1.get("currentRound") or 4, 4) + 1):
+        d = _holebyhole_round(tid, r)
+        if d.get("available"):
+            rounds_data[r] = d
+    # (courseId, round, hole) -> [n, strokes, e, b, p, bo, d, o]; round 0 = week
+    acc: dict[tuple[str, int, int], list] = {}
+    pars: dict[tuple[str, int], int] = {}
+    for rnd, data in rounds_data.items():
+        for p in data["players"]:
+            cid = p.get("courseId") or ""
+            for s in p["scores"]:
+                pars[(cid, s["h"])] = s["par"]
+                for k in ((cid, rnd, s["h"]), (cid, 0, s["h"])):
+                    a = acc.setdefault(k, [0, 0, 0, 0, 0, 0, 0, 0])
+                    a[0] += 1
+                    a[1] += s["s"]
+                    d = s["s"] - s["par"]
+                    a[2 + (0 if d <= -2 else 1 if d == -1 else 2 if d == 0
+                           else 3 if d == 1 else 4 if d == 2 else 5)] += 1
+    if not acc:
+        return False
+    cids = {c for (c, _, _) in acc}
+    filled = False
+    for cr in payload.get("courses") or []:
+        cid = cr.get("courseId") or ""
+        use = cid if cid in cids else (next(iter(cids)) if len(cids) == 1 else None)
+        if use is None:
+            continue  # multi-course week whose ids don't line up: leave it be
+        # the skeleton's first block gives par/yards and the row ordering
+        # (holes 1-9, OUT, 10-18, IN, TOTAL)
+        skel: dict[Any, dict] = {}
+        order: list[Any] = []
+        for blk in cr.get("rounds") or []:
+            for r in blk.get("rows") or []:
+                key = r.get("hole") or r.get("label")
+                if key not in skel:
+                    skel[key] = r
+                    order.append(key)
+            break
+
+        def block(rnd: int, label: str) -> dict:
+            hole_vals = {}
+            for h in range(1, 19):
+                a = acc.get((use, rnd, h))
+                if a:
+                    avg = a[1] / a[0]
+                    hole_vals[h] = (avg, avg - pars[(use, h)], a)
+            sd = sorted(hole_vals.items(), key=lambda x: -x[1][1])
+            ranks, prev, prev_rank = {}, None, 0
+            for i, (h, (_, d, _)) in enumerate(sd):
+                if prev is None or d < prev - 1e-9:
+                    prev_rank, prev = i + 1, d
+                ranks[h] = prev_rank
+
+            def stat_row(sk: dict, keys: list[int], hole: int | None) -> dict:
+                vals = [hole_vals[h] for h in keys if h in hole_vals]
+                if not vals:
+                    return dict(sk)
+                avg = sum(v[0] for v in vals)
+                d = sum(v[1] for v in vals)
+                bkt = [sum(v[2][i] for v in vals) for i in range(2, 8)]
+                out = dict(sk)
+                out.update({
+                    "avg": f"{avg:.3f}", "diff": _fmt_cs_diff(d),
+                    "tendency": "ABOVE" if d > 1e-9 else "BELOW" if d < -1e-9 else "EVEN",
+                    "eagles": bkt[0], "birdies": bkt[1], "pars": bkt[2],
+                    "bogeys": bkt[3], "doubles": bkt[4], "others": bkt[5],
+                })
+                if hole is not None:
+                    out["rank"] = ranks.get(hole)
+                return out
+
+            rows = []
+            for key in order:
+                if isinstance(key, int):
+                    rows.append(stat_row(skel[key], [key], key))
+                elif key == "OUT":
+                    rows.append(stat_row(skel[key], list(range(1, 10)), None))
+                elif key == "IN":
+                    rows.append(stat_row(skel[key], list(range(10, 19)), None))
+                else:  # TOTAL
+                    rows.append(stat_row(skel[key], list(range(1, 19)), None))
+            return {"label": label, "round": rnd or None, "live": False, "rows": rows}
+
+        cr["rounds"] = ([block(0, "All Rounds")]
+                        + [block(r, f"Round {r}")
+                           for r in sorted(rounds_data, reverse=True)])
+        filled = True
+    return filled
+
+
 @app.get("/api/coursestats")
 def coursestats(response: Response, tournamentId: str, refresh: bool = False,
                 finalHint: bool = False) -> dict:
@@ -667,8 +789,15 @@ def coursestats(response: Response, tournamentId: str, refresh: bool = False,
     else:
         cached = _cache_get(key)
         if cached is not None:
-            response.headers["X-Cache"] = "HIT"
-            return json.loads(cached)
+            obj = json.loads(cached)
+            # a cached pre-2023 skeleton upgrades in place from the
+            # scorecards the first time it's read, then stays durable
+            if _cs_is_skeleton(obj) and _cs_fill_from_scorecards(tournamentId, obj):
+                _cache_set(key, json.dumps(obj))
+                response.headers["X-Cache"] = "FILL"
+            else:
+                response.headers["X-Cache"] = "HIT"
+            return obj
     q = """
     query CourseStats($tid: ID!) {
       courseStats(tournamentId: $tid) {
@@ -744,15 +873,18 @@ def coursestats(response: Response, tournamentId: str, refresh: bool = False,
             "rounds": blocks,
         })
     out = {"available": bool(courses), "courses": courses}
+    filled = bool(courses) and _cs_is_skeleton(out) and \
+        _cs_fill_from_scorecards(tournamentId, out)
     if courses:
         # immutable once rounds 1-4 all have a non-live block; otherwise the
         # numbers still move (live play, or future rounds not yet listed).
         # That rule can never fire for a 54-hole week or a match-play event
         # (rounds 1-4 never all appear) — finalHint (the season bulk loader,
-        # which only walks completed tournaments) pins those durable too.
+        # which only walks completed tournaments) pins those durable too, as
+        # does a successful skeleton fill (only completed events have them).
         played = {b["round"] for c in courses for b in c["rounds"] if b["round"]}
         live = any(b["live"] for c in courses for b in c["rounds"])
-        final = (played >= {1, 2, 3, 4} or finalHint) and not live
+        final = (played >= {1, 2, 3, 4} or finalHint or filled) and not live
         _cache_set(key, json.dumps(out), ttl=None if final else LIVE_TTL_S)
     response.headers["X-Cache"] = "MISS"
     return out

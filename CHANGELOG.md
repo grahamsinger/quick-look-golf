@@ -510,3 +510,18 @@ and POST /api/records/rebuild forces it.
 A **Depth** control (Top 10/25/50/100, remembered in localStorage) on the
 record book; list bodies scroll inside their card past ~10 rows with the
 card's header staying put. `/api/records` limit cap raised to 200.
+
+## Sep 2026 — pre-2023 course stats, filled from scorecards
+
+The Course view's stats table was all dashes before 2023 — the API's
+courseStats is only a par/yards skeleton back there. `/api/coursestats`
+now detects a skeleton and fills it server-side from the cached field
+scorecards (the record book's counting): averages, signed diffs,
+tendencies, ranks (competition ranking on diff), full buckets + T+, and
+OUT/IN/TOTAL rows — plus per-round blocks the old feed never had, so the
+round pills work on 2012–2022 events too. Cached skeletons upgrade in
+place on first read (X-Cache: FILL) and pin durable (skeletons only
+exist for completed events); the client needed no changes. Verified on
+the 2018 Honda Classic: the Bear Trap's 17th fills at 3.533 (+0.533),
+rank 1 — matching its all-time record-book entry exactly, since both
+count the same cards.
