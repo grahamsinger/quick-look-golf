@@ -92,6 +92,12 @@
       </div>
       <label for="recYear" id="recYearLabel">Season</label>
       <select id="recYear"><option value="">All seasons</option></select>
+      <label for="recEvents">Events</label>
+      <select id="recEvents">
+        <option value="">All events</option>
+        <option value="majors">Majors only</option>
+        <option value="regular">Non-majors</option>
+      </select>
       <label for="recDepth">Depth</label>
       <select id="recDepth">
         <option value="10">Top 10</option><option value="25">Top 25</option>
@@ -147,11 +153,13 @@
       $('recMeta').textContent = agg
         ? `${d.courses} courses · ${d.holes} holes with 4+ editions`
         : `${d.events} tournaments · ${d.holes} hole performances`;
-      $('scopeMeta').textContent = agg
+      const evTxt = $('recEvents').value === 'majors' ? ' · majors only'
+        : $('recEvents').value === 'regular' ? ' · majors excluded' : '';
+      $('scopeMeta').textContent = (agg
         ? `the same hole, every edition on that course, averaged`
         : d.year
           ? `the ${d.year} season, hole by hole`
-          : `every hole of every scorecard-backed event, 2012 → today`;
+          : `every hole of every scorecard-backed event, 2012 → today`) + evTxt;
       $('recBody').className = '';
       const per = agg ? 'across all editions' : 'per week';
       $('recBody').innerHTML = `
@@ -185,14 +193,27 @@
       const q = new URLSearchParams();
       if (mode === 'courses') q.set('mode', 'courses');
       else if ($('recYear').value) q.set('year', $('recYear').value);
+      if ($('recEvents').value) q.set('events', $('recEvents').value);
       if ($('recDepth').value !== '10') q.set('limit', $('recDepth').value);
-      const d = await fetch(`/api/records?${q}`).then(r => r.json());
+      let d;
+      try {
+        const r = await fetch(`/api/records?${q}`);
+        if (!r.ok) throw new Error(`server said ${r.status}`);
+        d = await r.json();
+      } catch (e) {
+        $('recBody').className = 'recload';
+        $('recBody').innerHTML = `Couldn't load the record book (${esc(e.message)}).
+          Is the server running? <button type="button" id="recRetry" class="rsegbtn active">Try again</button>`;
+        $('recRetry').addEventListener('click', load);
+        return;
+      }
       if ($('recYear').options.length === 1) {
         d.years.forEach(yr => $('recYear').insertAdjacentHTML('beforeend', `<option>${yr}</option>`));
       }
       render(d);
     }
     $('recYear').addEventListener('change', load);
+    $('recEvents').addEventListener('change', load);
     $('recDepth').addEventListener('change', () => {
       try { localStorage.setItem('fairway-rec-depth', $('recDepth').value); } catch (e) {}
       load();

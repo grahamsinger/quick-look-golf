@@ -525,3 +525,25 @@ exist for completed events); the client needed no changes. Verified on
 the 2018 Honda Classic: the Bear Trap's 17th fills at 3.533 (+0.533),
 rank 1 — matching its all-time record-book entry exactly, since both
 count the same cards.
+
+## Sep 2026 — rotation weeks, a majors lens, and honest empty states
+
+- **Multi-course weeks**: the Course-stats card grew a course pill row on
+  rotation events (AmEx, Pebble) — flip between all courses' tables, not
+  just the host's. The hole-zoom field strip stays on the host course,
+  since that's whose aerial is on screen.
+- **Records events filter**: All events / Majors only / Non-majors, in
+  both record-book modes. The across-the-years editions floor drops to 2
+  under the majors lens — the rotas rarely revisit a course four times —
+  so Oakmont, Shinnecock and Pinehurst surface properly.
+- **Fallback pass**: nothing "just sits there" anymore. The Field view
+  distinguishes loading (spinner) / fetch failure (notice + Try again) /
+  genuinely no data; a team or match-play week (Zurich, Ryder Cup,
+  Presidents Cup) says exactly that, in place and in the status bar; the
+  Course view's stats slot shows "loading course stats…" or "no field
+  stats published" instead of vanishing; a failed player-round load
+  leaves a proper notice where the data was going, not just a status
+  line; the records and admin pages catch fetch failures with a message
+  and a retry button. Real team/match-play support (team race chart,
+  match-play brackets — the schema has the types) is logged in
+  NEXT_STEPS as its own project.

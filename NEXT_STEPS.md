@@ -24,6 +24,15 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   its 18th shows as two lineages — arguably honest, but a name-based
   merge option exists). (The pre-2023 Course-view stats gap is fixed:
   skeletons now fill from scorecards server-side.)
+- **Team & match-play events, real support** — the app now HANDLES them
+  (honest in-place messages in the Field view and status bar instead of
+  blank screens), but first-class support is its own project: the schema
+  has `teamStrokePlayLeaderboard`-style types (`TspTeamRow` with
+  `firstNine`/`secondNine` team scorecards) for Zurich, and
+  `matchPlayLeaderboard` / `cupTeeTimes` families for the Ryder and
+  Presidents Cups — a team race chart and a match-play bracket view are
+  both plausible. Needs schema exploration first (what resolves, how far
+  back).
 - **Non-standard formats need support** (surfaced by the 2025 season
   download; today they just show "—" for field rounds): the **Ryder Cup**
   (match play — no stroke-play scorecards in `leaderboardHoleByHole`; the

@@ -140,9 +140,9 @@ function getHoleMap(tid, hole) {
 // round. statsPick = which block the overview table shows (a pill label);
 // it resets when the tournament changes.
 const statsCache = new Map();  // tournamentId -> coursestats payload | null (in flight)
-let statsPick = null, statsTid = null;
+let statsPick = null, statsCourse = null, statsTid = null;
 function getCourseStats(tid) {
-  if (statsTid !== tid) { statsTid = tid; statsPick = null; }
+  if (statsTid !== tid) { statsTid = tid; statsPick = null; statsCourse = null; }
   const cs = statsCache.get(tid);
   if (cs === undefined) {
     statsCache.set(tid, null);
@@ -158,6 +158,18 @@ function hostCourseStats(payload) {
   if (!payload || !payload.available) return null;
   const cs = (payload.courses || []).find(c => c.hostCourse) || (payload.courses || [])[0];
   return cs && (cs.rounds || []).length ? cs : null;
+}
+
+// …but the stats table lets a rotation week (AmEx, Pebble) flip between
+// courses: statsCourse = the picked courseId, reset with the tournament
+function statsCourses(payload) {
+  if (!payload || !payload.available) return [];
+  return (payload.courses || []).filter(c => (c.rounds || []).length);
+}
+function pickedCourseStats(payload) {
+  const list = statsCourses(payload);
+  return list.find(c => c.courseId === statsCourse)
+    || list.find(c => c.hostCourse) || list[0] || null;
 }
 
 // All-rounds shot data for the hole overlay, fetched lazily (fetchRound's
@@ -222,9 +234,20 @@ const ord = n => {
 };
 
 function courseStatsCard(payload, zoomable = true) {
-  const cs = hostCourseStats(payload);
-  if (!cs) return '';
+  // never leave the reader guessing: in-flight and absent both say so
+  if (payload === null) {
+    return '<div class="caphint statswait"><span class="fspin"></span>loading course stats…</div>';
+  }
+  const cs = pickedCourseStats(payload);
+  if (!cs) {
+    return '<div class="caphint statswait">No hole-by-hole field stats published for this tournament.</div>';
+  }
   const blk = cs.rounds.find(b => b.label === statsPick) || cs.rounds[0];
+  const clist = statsCourses(payload);
+  const cpills = clist.length > 1
+    ? `<span class="statspills cpills">${clist.map(c =>
+        `<button type="button" class="spill${c === cs ? ' on' : ''}" data-cpill="${esc(c.courseId)}">${esc(c.courseName || c.courseId)}</button>`).join('')}</span>`
+    : '';
   const pills = cs.rounds.map(b =>
     `<button type="button" class="spill${b === blk ? ' on' : ''}" data-pill="${esc(b.label)}">${esc(b.label)}${b.live ? '<i class="lived"></i>' : ''}</button>`).join('');
   const num = v => v == null ? '' : v;
@@ -240,7 +263,7 @@ function courseStatsCard(payload, zoomable = true) {
   }).join('');
   return `<div class="card statscard">
     <div class="statsbar"><span class="statstitle">Course stats</span>
-      ${(payload.courses || []).length > 1 ? `<span class="statsmeta">${esc(cs.courseName || '')}</span>` : ''}
+      ${cpills}
       <span class="statspills">${pills}</span></div>
     <table class="cstats">
       <thead><tr><th>Hole</th><th>Par</th><th>Yds</th><th>Avg</th><th>±</th><th title="1 = hardest">Rank</th>
@@ -254,8 +277,10 @@ function courseStatsCard(payload, zoomable = true) {
 function wireStatsCard() {
   const sc = $('out').querySelector('.statscard');
   if (!sc) return;
-  sc.querySelectorAll('.spill').forEach(b =>
+  sc.querySelectorAll('[data-pill]').forEach(b =>
     b.addEventListener('click', () => { statsPick = b.dataset.pill; renderCourse(); }));
+  sc.querySelectorAll('[data-cpill]').forEach(b =>
+    b.addEventListener('click', () => { statsCourse = b.dataset.cpill; renderCourse(); }));
   sc.querySelectorAll('tr[data-hole]').forEach(tr =>
     tr.addEventListener('click', () => zoomToHole(Number(tr.dataset.hole))));
 }

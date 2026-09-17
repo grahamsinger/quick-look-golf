@@ -31,7 +31,8 @@ function getField(tid, rnd) {
         if (state.view === 'field') renderField();
       })
       .catch(() => {
-        fieldCache.set(key, { res: { available: false }, ts: Date.now(), live: true });
+        // a failed fetch is not "no scores" — say so, and offer a retry
+        fieldCache.set(key, { res: { available: false, error: true }, ts: Date.now(), live: true });
         if (state.view === 'field') renderField();
       });
   }
@@ -105,7 +106,17 @@ export function renderField() {
   const d = getField(tid, rnd);
   const entry = fieldCache.get(`${tid}:${rnd}`);
   scheduleLiveRefresh(entry && entry.live);
-  if (d === null) { $('out').innerHTML = '<div class="summary"><span class="meta">Loading the field…</span></div>'; return; }
+  if (d === null) { $('out').innerHTML = '<div class="summary"><span class="meta"><span class="fspin"></span>Loading the field…</span></div>'; return; }
+  if (d.error) {
+    $('out').innerHTML = `<div class="summary"><span class="meta">Couldn't load the field —
+      the server (or the PGA API behind it) didn't answer.</span></div>
+      <button type="button" class="btn-ghost" id="fieldRetry">Try again</button>`;
+    $('out').querySelector('#fieldRetry').addEventListener('click', () => {
+      fieldCache.delete(`${tid}:${rnd}`);
+      renderField();
+    });
+    return;
+  }
 
   const lb = state.players || [];
   const lbIdx = new Map(lb.map((p, i) => [p.id, i]));
@@ -125,7 +136,12 @@ export function renderField() {
     : [];
 
   if (!started.length && !waiting.length) {
-    $('out').innerHTML = '<div class="summary"><span class="meta">No hole-by-hole scores for this round yet.</span></div>';
+    // an empty leaderboard alongside no scorecards is the signature of a
+    // team or match-play week (Zurich, Ryder Cup, Presidents Cup…)
+    const teamish = !(state.players || []).length;
+    $('out').innerHTML = `<div class="summary"><span class="meta">${teamish
+      ? 'No individual scorecards for this event — it looks like a team or match-play week (Zurich, Ryder Cup, Presidents Cup…), and the feed only publishes per-player cards for stroke play.'
+      : 'No hole-by-hole scores for this round yet.'}</span></div>`;
     return;
   }
 

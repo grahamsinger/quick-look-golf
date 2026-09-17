@@ -521,6 +521,17 @@ tr.fexpend td { border-bottom: 2px solid var(--line-2); }
 .spill:hover { border-color: var(--pine); color: var(--pine); }
 .spill.on { background: var(--pine); border-color: var(--pine); color: #F4EFE2; }
 .spill .lived { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--flag); margin-left: 6px; }
+/* rotation weeks: a second pill row picks the course; it hugs the title
+   while the round pills keep the right edge */
+.statspills.cpills { margin-left: 0; }
+/* stats slot placeholders (loading / nothing published) */
+.statswait { margin: 10px 2px 14px; }
+.statswait .fspin { margin-right: 7px; }
+/* quiet secondary button (retries, small actions) */
+.btn-ghost { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px;
+  font-weight: 600; color: var(--pine); background: none; border: 1px solid var(--line-2);
+  border-radius: var(--r-sm); padding: 5px 13px; cursor: pointer; }
+.btn-ghost:hover { border-color: var(--pine); }
 table.cstats { border-collapse: collapse; width: auto; }
 table.cstats th, table.cstats td { padding: 6px 12px; border-bottom: 1px solid var(--line);
   font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }

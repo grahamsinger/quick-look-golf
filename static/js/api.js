@@ -66,6 +66,12 @@ export async function loadShots(opts = {}) {
   // not blank the leaderboard while the player's shots load)
   const background = !!opts.background;
   const tid = $('tourn').value, pid = $('player').value, rnd = $('round').value;
+  if (tid && !pid && state.players && !state.players.length) {
+    // a picked tournament with an empty leaderboard = team/match-play week
+    status('No individual players on this leaderboard — team and match-play weeks (Zurich, Ryder Cup…) don’t publish per-player data.', true);
+    if (state.view === 'field') renderView();  // the Field view says it in place too
+    return;
+  }
   if (!tid || !pid) { status('Pick a tournament and player first.', true); return; }
   const seq = ++loadSeq;
   $('go').disabled = true;
@@ -128,6 +134,15 @@ export async function loadShots(opts = {}) {
     if (seq !== loadSeq) return;
     state.shots = state.putts = state.puttsAll = null;
     status('Load failed: ' + e.message + '  (player may not have played this round)', true);
+    // the status bar is easy to miss when the page below it is blank —
+    // leave a proper notice where the data was going to be
+    if (!background) {
+      $('out').innerHTML = `<div class="summary"><span class="meta">Couldn't load this round —
+        ${e.message.includes('404') || e.message.toLowerCase().includes('not')
+          ? 'the player may not have data for it'
+          : 'the server (or the PGA API behind it) didn’t answer'}.
+        Try another round, or hit Load again.</span></div>`;
+    }
   } finally {
     if (seq === loadSeq) { $('go').disabled = false; updateRoundNav(); }
   }

@@ -1254,19 +1254,34 @@ def records_rebuild(year: int | None = None) -> dict:
 _REC_MIN_WEEK = 100
 _REC_MIN_ROUND = 30
 
+# the four majors, by schedule name (Q-School's "PGA TOUR..." doesn't match)
+_MAJORS_SQL = ("(name LIKE '%Masters Tournament%' OR name LIKE '%PGA Championship%'"
+               " OR name LIKE '%U.S. Open%' OR name LIKE '%The Open Championship%')")
+
+
+def _events_clause(events: str) -> str:
+    if events == "majors":
+        return f"AND {_MAJORS_SQL}"
+    if events == "regular":
+        return f"AND NOT {_MAJORS_SQL}"
+    return ""
+
 
 @app.get("/api/records")
-def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> dict:
+def records(year: int | None = None, limit: int = 10, mode: str = "weeks",
+            events: str = "all") -> dict:
     """The Records page bundle: hardest/easiest holes by par, double+ and
-    birdie rates, hardest single rounds — all-time or one season. With
-    mode=courses, the across-the-years aggregation instead."""
+    birdie rates, hardest single rounds — all-time or one season, over all
+    events / majors only / everything else. With mode=courses, the
+    across-the-years aggregation instead."""
     limit = max(1, min(limit, 200))
     # read-time freshness: re-derives any season whose cached scorecards
     # are newer than its stamp (usually none; ~0.3 s per stale season) —
     # also what populates a brand-new stats file on its first read
     _records_freshen()
     if mode == "courses":
-        return _records_courses(limit)
+        return _records_courses(limit, events)
+    ew = _events_clause(events)
     yw = "AND year = ?" if year is not None else ""
     ya: tuple = (year,) if year is not None else ()
 
@@ -1286,9 +1301,10 @@ def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> di
             "SELECT DISTINCT year FROM hole_stats ORDER BY year DESC")]
         n_events, n_holes = c.execute(
             f"SELECT COUNT(DISTINCT tournament_id), COUNT(*) FROM hole_stats "
-            f"WHERE round = 0 {yw}", ya).fetchone()
+            f"WHERE round = 0 {yw} {ew}", ya).fetchone()
 
-    week = (f"SELECT * FROM hole_stats WHERE round = 0 AND players >= {_REC_MIN_WEEK} {yw}")
+    week = (f"SELECT * FROM hole_stats WHERE round = 0"
+            f" AND players >= {_REC_MIN_WEEK} {yw} {ew}")
     out: dict[str, Any] = {"year": year, "years": years,
                            "events": n_events, "holes": n_holes,
                            "hardest": {}, "easiest": {}}
@@ -1306,7 +1322,7 @@ def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> di
         f"{week} ORDER BY (eagles + birdies) * 1.0 / players DESC LIMIT ?",
         ya + (limit,))
     out["rounds"] = pick(
-        f"SELECT * FROM hole_stats WHERE round > 0 AND players >= {_REC_MIN_ROUND} {yw} "
+        f"SELECT * FROM hole_stats WHERE round > 0 AND players >= {_REC_MIN_ROUND} {yw} {ew} "
         f"ORDER BY diff DESC, players DESC LIMIT ?", ya + (limit,))
     return out
 
@@ -1315,12 +1331,17 @@ def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> di
 _REC_MIN_EDITIONS = 4
 
 
-def _records_courses(limit: int) -> dict:
+def _records_courses(limit: int, events: str = "all") -> dict:
     """The across-the-years bundle: the same hole aggregated over every
     edition played on that course. Grouped by (course, hole, par) — a
     re-pared hole gets separate lives, not a blended average — with
     averages weighted by each edition's player-rounds. The deep link goes
-    to the latest edition (lexical MAX of the R-ids sorts by year)."""
+    to the latest edition (lexical MAX of the R-ids sorts by year).
+    A majors filter drops the editions floor to 2 — the rotas (U.S. Open,
+    PGA, The Open) rarely revisit a course four times in fifteen years."""
+    ew = _events_clause(events)
+    min_eds = 2 if events == "majors" else _REC_MIN_EDITIONS
+
     def q(parw: str, order: str) -> str:
         return (
             "SELECT course_id, MAX(course_name) AS course_name, hole, par,"
@@ -1333,8 +1354,8 @@ def _records_courses(limit: int) -> dict:
             " SUM(bogeys) AS bogeys, SUM(doubles) AS doubles, SUM(others) AS others,"
             " MAX(tournament_id) AS latest_tid"
             f" FROM hole_stats WHERE round = 0 AND players >= {_REC_MIN_WEEK}"
-            f" AND course_id != '' {parw}"
-            f" GROUP BY course_id, hole, par HAVING COUNT(*) >= {_REC_MIN_EDITIONS}"
+            f" AND course_id != '' {ew} {parw}"
+            f" GROUP BY course_id, hole, par HAVING COUNT(*) >= {min_eds}"
             f" ORDER BY {order} LIMIT ?")
 
     def pick(sql: str, args: tuple) -> list[dict]:
