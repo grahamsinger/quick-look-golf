@@ -184,16 +184,16 @@ export function renderField() {
 
   // inline scorecards for the expanded player: one sub-row per round —
   // raw hole scores colored by result, Rd = that round, Tot = through it.
-  // Newest first. The viewed round joins the stack only once the player's
-  // card for it is complete — mid-round it would duplicate the live main
-  // row (whose cell colors are its scores, Rd column its running total).
+  // Newest first. A mid-round card shows too, labeled "thru N" — raw
+  // strokes complement the live main row's running totals, and skipping it
+  // left a round-1 click expanding nothing at all. Only a round the player
+  // hasn't started yet stays out (there's nothing to draw).
   let expHtml = '';
   if (expandedPid && ordered.some(r => r.id === expandedPid)) {
     const viewed = started.find(p => p.id === expandedPid);
-    const viewedDone = !!viewed && viewed.scores.length === 18;
     const parts = [];
     for (let r = maxRound(); r >= 1; r--) {
-      if (r === rnd && !viewedDone) continue;
+      if (r === rnd && !viewed) continue;
       const rd = getField(tid, r);  // cached; a miss fetches and re-renders
       if (rd === null) {
         parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}</td>
@@ -212,7 +212,8 @@ export function renderField() {
       const strokes = p.total && p.total !== '-' ? p.total : '';
       const cum = p.start + p.diff;
       const mark = st > 1 ? `<span class="ftee10" title="starting hole: ${st}">*</span>` : '';
-      parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}${mark}</td>${cells}
+      const thru = p.scores.length < 18 ? ` · thru ${p.scores.length}` : '';
+      parts.push(`<tr class="fexp"><td class="fpos"></td><td class="fname">Round ${r}${mark}${thru}</td>${cells}
         <td class="frd">${esc(strokes)} <b class="${sgnCls(p.diff)}">${fmtPar(p.diff)}</b></td>
         <td class="ftot"><b class="${sgnCls(cum)}">${fmtPar(cum)}</b></td></tr>`);
     }

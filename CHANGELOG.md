@@ -448,3 +448,9 @@ chart falls back to hole order, unmarked). The bulk loader warms it per
 event and audits it ("tees y/n"). Notable dead end for the record:
 `HoleScore.sequenceNumber` is the display column index (OUT = 9), NOT
 play order.
+
+Follow-up: the scorecard expansion now includes an **in-progress
+round**, labeled "Round N · thru X" — the old only-complete-cards rule
+meant a round-1 click expanded nothing at all for anyone still on the
+course (raw strokes complement the live row's running totals; only a
+round the player hasn't started stays out).
