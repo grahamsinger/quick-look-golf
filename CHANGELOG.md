@@ -504,3 +504,9 @@ lands while the schedule still says IN_PROGRESS (the event is skipped as
 incomplete, and no later cache write would re-trip the watermark). The
 existing triggers stay: bulk downloads fold their year in on completion,
 and POST /api/records/rebuild forces it.
+
+## Sep 2026 — deeper record tables
+
+A **Depth** control (Top 10/25/50/100, remembered in localStorage) on the
+record book; list bodies scroll inside their card past ~10 rows with the
+card's header staying put. `/api/records` limit cap raised to 200.

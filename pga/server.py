@@ -1128,7 +1128,7 @@ def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> di
     """The Records page bundle: hardest/easiest holes by par, double+ and
     birdie rates, hardest single rounds — all-time or one season. With
     mode=courses, the across-the-years aggregation instead."""
-    limit = max(1, min(limit, 50))
+    limit = max(1, min(limit, 200))
     # read-time freshness: re-derives any season whose cached scorecards
     # are newer than its stamp (usually none; ~0.3 s per stale season) —
     # also what populates a brand-new stats file on its first read

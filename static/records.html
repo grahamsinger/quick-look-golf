@@ -35,6 +35,8 @@
     @media (max-width: 1050px) { .recgrid, .recgrid.two { grid-template-columns: 1fr; } }
     .card .chead { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
       color: var(--ink-3); padding: 8px 14px 7px; border-bottom: 1.5px solid var(--line-2); }
+    /* deeper lists scroll inside their card; the head stays put above */
+    .card .tscroll { max-height: 478px; overflow-y: auto; overscroll-behavior: contain; }
     /* fixed layout so the event column truncates with an ellipsis instead
        of pushing the table past the card edge */
     table.rtab { border-collapse: collapse; width: 100%; table-layout: fixed; }
@@ -90,6 +92,11 @@
       </div>
       <label for="recYear" id="recYearLabel">Season</label>
       <select id="recYear"><option value="">All seasons</option></select>
+      <label for="recDepth">Depth</label>
+      <select id="recDepth">
+        <option value="10">Top 10</option><option value="25">Top 25</option>
+        <option value="50">Top 50</option><option value="100">Top 100</option>
+      </select>
       <span class="meta" id="recMeta"></span>
     </div>
     <div id="recBody" class="recload"><span class="fspin"></span>compiling the record book…</div>
@@ -131,8 +138,8 @@
 
     const tableCard = (head, list, val) => `<div class="card">
       <div class="chead">${head}</div>
-      <table class="rtab">${list.map((e, i) => rowHtml(e, i, val(e))).join('')
-        || '<tr><td class="rk"></td><td>nothing yet</td></tr>'}</table></div>`;
+      <div class="tscroll"><table class="rtab">${list.map((e, i) => rowHtml(e, i, val(e))).join('')
+        || '<tr><td class="rk"></td><td>nothing yet</td></tr>'}</table></div></div>`;
 
     function render(d) {
       const P = { 3: 'Par 3s', 4: 'Par 4s', 5: 'Par 5s' };
@@ -173,16 +180,23 @@
       load();
     }
 
+    try { $('recDepth').value = localStorage.getItem('fairway-rec-depth') || '10'; } catch (e) {}
     async function load() {
-      const y = mode === 'weeks' ? $('recYear').value : '';
-      const qs = mode === 'courses' ? '?mode=courses' : (y ? `?year=${y}` : '');
-      const d = await fetch(`/api/records${qs}`).then(r => r.json());
+      const q = new URLSearchParams();
+      if (mode === 'courses') q.set('mode', 'courses');
+      else if ($('recYear').value) q.set('year', $('recYear').value);
+      if ($('recDepth').value !== '10') q.set('limit', $('recDepth').value);
+      const d = await fetch(`/api/records?${q}`).then(r => r.json());
       if ($('recYear').options.length === 1) {
         d.years.forEach(yr => $('recYear').insertAdjacentHTML('beforeend', `<option>${yr}</option>`));
       }
       render(d);
     }
     $('recYear').addEventListener('change', load);
+    $('recDepth').addEventListener('change', () => {
+      try { localStorage.setItem('fairway-rec-depth', $('recDepth').value); } catch (e) {}
+      load();
+    });
     $('modeWeeks').addEventListener('click', () => setMode('weeks'));
     $('modeCourses').addEventListener('click', () => setMode('courses'));
     load();
