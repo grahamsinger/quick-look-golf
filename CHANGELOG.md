@@ -560,3 +560,12 @@ ordinary window sizes); and the cryptic "435 pr" became **"435 rounds"**
 widened to fit and the footer rewritten in plain words. From 556 clipped
 names out of 900 at 1512px to 7 (the truly marathon titles, which keep
 tooltips).
+
+## Sep 2026 — the pin is a flag
+
+The hole-zoom and green-view pin was a cream dot — identical to the ball
+dots around it. It's now a little flagstick: dark cup, cream stick, red
+pennant. The glyph lives inside the rotated aerial group, so it
+counter-rotates by the same angle to keep flying upright in every
+orientation (landscape/portrait, flipped or not), and scales per context
+(1.9× on the full-hole aerial, 1:1 at putt scale on the green).

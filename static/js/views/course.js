@@ -447,12 +447,12 @@ function renderHole(cm) {
   // direction — when the tee projects above the pin, rotate the whole aerial
   // 180° so "tee at the bottom, green at the top" is true at every course.
   const pt2 = cm.pinsTees && cm.pinsTees[holeNum - 1];
-  let marks = '', flip = false;
+  let flip = false, pinXY = null;
   if (pt2 && pt2.length >= 4) {
     const [px, py] = holeWorldToPx(hm, pt2[0], pt2[1]);
     const [, ty] = holeWorldToPx(hm, pt2[2], pt2[3]);
     flip = ty < py;
-    marks = `<g class="hpin"><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="9"/><title>Pin (marked position)</title></g>`;
+    pinXY = [px, py];
   }
 
   // Desktop gets the hole horizontal (tee left → green right, like a hole
@@ -466,6 +466,19 @@ function renderHole(cm) {
     gT = flip ? `rotate(-90) translate(-1000 0)` : `rotate(90) translate(0 -${vbH})`;
   } else if (flip) {
     gT = `rotate(180 500 ${(vbH / 2).toFixed(1)})`;
+  }
+
+  // the pin draws as a little flagstick (dark cup, red pennant) so it can't
+  // be mistaken for a ball. It lives inside the rotated group, so it
+  // counter-rotates by the same angle to keep flying upright.
+  let marks = '';
+  if (pinXY) {
+    const unrot = landscape ? (flip ? 90 : -90) : (flip ? 180 : 0);
+    marks = `<g class="hpin" transform="translate(${pinXY[0].toFixed(1)} ${pinXY[1].toFixed(1)})${unrot ? ` rotate(${unrot})` : ''}">
+      <g class="flag"><line class="stick" x1="0" y1="0" x2="0" y2="-24"/>
+      <path class="pennant" d="M0 -24 L15 -18.5 L0 -13 Z"/>
+      <circle class="cup" r="4.5"/></g>
+      <title>Pin (marked position)</title></g>`;
   }
   const wrapStyle = landscape
     ? `aspect-ratio:${t.fullH}/${t.fullW};width:980px`

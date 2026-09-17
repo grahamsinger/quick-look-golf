@@ -366,7 +366,7 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .holemap .chole:hover polyline { stroke-width: 8; }
 .holemap .cpt { r: 11; }
 .holemap .chole:hover .cpt { r: 13; }
-.holemap .hpin circle { r: 12; }
+.holemap .hpin .flag { transform: scale(1.9); }  /* full-hole aerial scale */
 /* round trail colors (all-rounds overlay): color follows the round, never
    repainted on hover — validated for adjacent-pair CVD separation */
 .chole.hr { cursor: default; --rc: #F5F1E6; }
@@ -376,8 +376,14 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .chole.hr polyline { stroke: var(--rc); }
 .chole.hr .cpt { fill: var(--rc); }
 .chole.hr:hover polyline { stroke: var(--rc); stroke-width: 6; }
-.hpin circle { fill: #FCF9F0; stroke: rgba(20,20,20,.75); stroke-width: 2;
-  filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
+/* the pin flag: cream stick, red pennant, dark cup — reads as "the hole"
+   at any zoom, unlike a ball-colored dot. Scaling happens on the inner
+   .flag group so the outer translate/rotate (upright compensation for the
+   hole rotation) stays untouched. */
+.hpin { filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
+.hpin .stick { stroke: #FCF9F0; stroke-width: 2.4; stroke-linecap: round; }
+.hpin .pennant { fill: var(--flag); stroke: #FCF9F0; stroke-width: 1.3; stroke-linejoin: round; }
+.hpin .cup { fill: rgba(18,18,18,.85); stroke: #FCF9F0; stroke-width: 1.6; }
 /* legend chips: swatch = round color; score keeps the app's result colors */
 .rleg { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
 .rlegchip { display: inline-flex; align-items: center; gap: 6px; }
@@ -394,7 +400,7 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .holemap .greenview .chole:hover polyline { stroke-width: 3.5; }
 .holemap .greenview .cpt { r: 4.5; }
 .holemap .greenview .chole:hover .cpt { r: 5.5; }
-.holemap .greenview .hpin circle { r: 5; stroke-width: 1.2; }
+.holemap .greenview .hpin .flag { transform: none; }  /* putt scale: 1:1 */
 /* play-by-play fills the space beside the green view, packing its round
    columns into whatever width is left (2×2 beside it on desktop) */
 .pbp { flex: 1 1 340px; min-width: 300px; display: grid;
