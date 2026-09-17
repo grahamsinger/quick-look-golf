@@ -935,9 +935,9 @@ def teetimes(response: Response, tournamentId: str, refresh: bool = False,
 
 # --- records: cross-tournament hole stats -----------------------------------
 # Cross-event questions ("hardest par 3 since 2012") need queryable rows,
-# not per-event JSON blobs — this derives data/stats.sqlite (its own file:
-# cache.sqlite stays a purgeable cache, this is a rebuildable mart — both
-# disposable). One row per hole per round per event; round 0 = the whole
+# not per-event JSON blobs — this derives data/stats.sqlite, the records
+# DB (its own file: cache.sqlite stays a purgeable cache, and this stays
+# a derived copy — either can be deleted and rebuilt from the other side). One row per hole per round per event; round 0 = the whole
 # week. The source is the cached FIELD SCORECARDS, not courseStats:
 # courseStats has no numbers before 2023 (older payloads are par/yards
 # skeletons with "-" averages), while the scorecards run to 2012 and were
@@ -969,8 +969,13 @@ try:
         )
         _c.execute("CREATE INDEX IF NOT EXISTS idx_hs_year ON hole_stats(year)")
         _c.execute("CREATE INDEX IF NOT EXISTS idx_hs_par ON hole_stats(par, round)")
+        # per-year freshness stamps: when each season was last derived
+        _c.execute("CREATE TABLE IF NOT EXISTS rec_meta ("
+                   " year INTEGER PRIMARY KEY, derived_at REAL NOT NULL)")
 except _DISK_ERRORS as _e:
     _tier_warn("stats-init", _e)
+
+_records_lock = threading.Lock()  # rebuilds are idempotent; just don't overlap
 
 
 def _records_rebuild(year: int | None = None) -> dict:
@@ -1057,7 +1062,11 @@ def _records_rebuild(year: int | None = None) -> dict:
                          rnd, hole, a[8], yards.get((cid, hole)), avg,
                          round(avg - a[8], 3), None,
                          a[2], a[3], a[4], a[5], a[6], a[7], a[0]))
-    with _stats_db() as c:
+    stamp_years = {year} if year is not None else {int(t[1:5]) for t in by_tid}
+    now = time.time()
+    with _records_lock, _stats_db() as c:
+        # one transaction: readers see the old season or the new one, never
+        # a half-derived state — and the stamp lands with the data
         if year is None:
             c.execute("DELETE FROM hole_stats")
         else:
@@ -1065,7 +1074,41 @@ def _records_rebuild(year: int | None = None) -> dict:
         c.executemany(
             "INSERT OR REPLACE INTO hole_stats VALUES "
             "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+        c.executemany("INSERT OR REPLACE INTO rec_meta VALUES (?, ?)",
+                      [(y, now) for y in stamp_years])
     return {"events": events, "rows": len(rows)}
+
+
+_REC_CURRENT_TTL_S = 3600
+
+
+def _records_freshen() -> None:
+    """Keep the records DB fairly live without a write-through: per season,
+    compare the newest scorecard key in the cache (its created_at) against
+    the season's derived_at stamp and re-derive only the stale ones
+    (~0.3 s each, so it runs inline on a records read). The current season
+    also refreshes on an hourly floor — its final data can land while the
+    schedule still says IN_PROGRESS (the event is skipped as incomplete),
+    and no later cache write would re-trip the watermark."""
+    prefix = f"golf:{CACHE_VERSION}:holebyhole:"
+    try:
+        with _disk() as c:
+            marks = dict(c.execute(
+                "SELECT CAST(substr(key, ?, 4) AS INTEGER) AS y, MAX(created_at)"
+                " FROM cache WHERE key LIKE ? GROUP BY y",
+                (len(prefix) + 2, prefix + "%")))
+    except _DISK_ERRORS as e:
+        _tier_warn("stats-freshen", e)
+        return
+    with _stats_db() as c:
+        stamps = dict(c.execute("SELECT year, derived_at FROM rec_meta"))
+    now = time.time()
+    this_year = time.localtime().tm_year
+    stale = [y for y, m in marks.items()
+             if m > stamps.get(y, 0)
+             or (y == this_year and now - stamps.get(y, 0) > _REC_CURRENT_TTL_S)]
+    for y in sorted(stale, reverse=True):
+        _records_rebuild(y)
 
 
 @app.post("/api/records/rebuild")
@@ -1086,9 +1129,10 @@ def records(year: int | None = None, limit: int = 10, mode: str = "weeks") -> di
     birdie rates, hardest single rounds — all-time or one season. With
     mode=courses, the across-the-years aggregation instead."""
     limit = max(1, min(limit, 50))
-    with _stats_db() as c:
-        if c.execute("SELECT 1 FROM hole_stats LIMIT 1").fetchone() is None:
-            _records_rebuild()  # first hit on a fresh file: derive in place
+    # read-time freshness: re-derives any season whose cached scorecards
+    # are newer than its stamp (usually none; ~0.3 s per stale season) —
+    # also what populates a brand-new stats file on its first read
+    _records_freshen()
     if mode == "courses":
         return _records_courses(limit)
     yw = "AND year = ?" if year is not None else ""
@@ -1425,11 +1469,11 @@ def _bulk_run_season(year: str) -> None:
         _blog.warning("=== %s flagged: %s", year,
                       "; ".join(f"{r['id']} {r['name']} ({', '.join(r['flags'])})"
                                 for r in flagged))
-    try:  # fold the fresh season into the records mart
+    try:  # fold the fresh season into the records DB
         rc = _records_rebuild(int(year))
         _blog.info("=== %s records: %d events -> %d hole rows",
                    year, rc["events"], rc["rows"])
-    except Exception as e:  # noqa: BLE001 — the mart is rebuildable, never fatal
+    except Exception as e:  # noqa: BLE001 — the records DB is rebuildable, never fatal
         _blog.warning("=== %s records rebuild failed: %s", year, e)
 
 

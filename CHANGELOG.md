@@ -490,3 +490,17 @@ Village's 16th over 15 editions, Augusta's 4th, Doral's Blue Monster
 18th as both hardest par 4 and top double+ factory, Kapalua's 5th /
 Riviera's 1st / Waialae's 9th ruling the birdie lists — and exactly one
 par 5 in the dataset plays over par across editions (Sheshan's 8th).
+
+## Sep 2026 — records freshness
+
+The records DB stays "fairly live" without a write-through: rebuilds are
+one-way, idempotent, per-season transactions (readers never see a
+half-derived state), and every records read now runs a freshness check —
+each season's newest cached scorecard (created_at watermark) vs that
+season's derived_at stamp in a new rec_meta table, re-deriving only
+stale seasons inline (~0.3 s each). The current season also refreshes on
+an hourly floor, covering the Sunday-night case where the final data
+lands while the schedule still says IN_PROGRESS (the event is skipped as
+incomplete, and no later cache write would re-trip the watermark). The
+existing triggers stay: bulk downloads fold their year in on completion,
+and POST /api/records/rebuild forces it.

@@ -88,8 +88,13 @@ default. Self-hosted Fraunces display serif.
   holes by par, double+ and birdie-or-better rates, hardest single rounds —
   all-time or one season, every entry deep-linking into that hole's aerial.
   Derived entirely from the cached field scorecards into `data/stats.sqlite`
-  (a rebuildable mart; each season download tops up its year), because
-  the API's own courseStats has no numbers before 2023.
+  (a separate, disposable file — rebuildable from the cache at any time),
+  because the API's own courseStats has no numbers before 2023. It stays
+  **fairly live without any write-through**: every records read compares
+  each season's newest cached scorecard against that season's derived-at
+  stamp and re-derives only stale seasons inline (~0.3 s each; the current
+  season also refreshes on an hourly floor), and each bulk season download
+  folds its year in on completion.
 - **Cache admin** (`/admin`, the "Cache" link in the topbar): an inventory of
   everything cached, **grouped by season into collapsible year sections**
   (newest open; your toggles are remembered) — per tournament: player rounds,
