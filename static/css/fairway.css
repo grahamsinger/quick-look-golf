@@ -382,7 +382,6 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
    hole rotation) stays untouched. */
 .hpin { filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
 .hpin .pennant { fill: var(--flag); stroke: #FCF9F0; stroke-width: 1.3; stroke-linejoin: round; }
-.hpin .cup { fill: rgba(18,18,18,.85); stroke: #FCF9F0; stroke-width: 1.6; }
 /* all-rounds overlay: each day's flag flies its round's color */
 .hpin.hr { --rc: #F5F1E6; }
 .hpin.hr.r2 { --rc: #FFD34D; }
