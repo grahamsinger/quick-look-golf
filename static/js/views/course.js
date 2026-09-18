@@ -486,8 +486,7 @@ function renderHole(cm) {
   const unrot = landscape ? (flip ? 90 : -90) : (flip ? 180 : 0);
   const flagAt = (x, y, cls, tip) =>
     `<g class="hpin${cls}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})${unrot ? ` rotate(${unrot})` : ''}">
-      <g class="flag"><line class="stick" x1="0" y1="0" x2="0" y2="-24"/>
-      <path class="pennant" d="M0 -24 L15 -18.5 L0 -13 Z"/>
+      <g class="flag"><path class="pennant" d="M0 -3 L15 -9.5 L0 -16 Z"/>
       <circle class="cup" r="4.5"/></g>
       <title>${tip}</title></g>`;
   let marks = '';

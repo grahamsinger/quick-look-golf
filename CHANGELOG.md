@@ -579,3 +579,7 @@ per round, pennant in that round's color (matching the trail legend);
 single-round mode plants that day's red flag; the static marked
 position survives only as a fallback when nothing holed out. Flags draw
 above the trails, rising from the final ball in the cup.
+
+(One more pass: the flagstick came off — the marker is now just the dark
+cup with the round-colored triangle rising directly from it. Less ink,
+same meaning.)

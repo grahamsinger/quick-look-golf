@@ -381,7 +381,6 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
    .flag group so the outer translate/rotate (upright compensation for the
    hole rotation) stays untouched. */
 .hpin { filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
-.hpin .stick { stroke: #FCF9F0; stroke-width: 2.4; stroke-linecap: round; }
 .hpin .pennant { fill: var(--flag); stroke: #FCF9F0; stroke-width: 1.3; stroke-linejoin: round; }
 .hpin .cup { fill: rgba(18,18,18,.85); stroke: #FCF9F0; stroke-width: 1.6; }
 /* all-rounds overlay: each day's flag flies its round's color */
