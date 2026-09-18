@@ -468,17 +468,35 @@ function renderHole(cm) {
     gT = `rotate(180 500 ${(vbH / 2).toFixed(1)})`;
   }
 
-  // the pin draws as a little flagstick (dark cup, red pennant) so it can't
-  // be mistaken for a ball. It lives inside the rotated group, so it
-  // counter-rotates by the same angle to keep flying upright.
-  let marks = '';
-  if (pinXY) {
-    const unrot = landscape ? (flip ? 90 : -90) : (flip ? 180 : 0);
-    marks = `<g class="hpin" transform="translate(${pinXY[0].toFixed(1)} ${pinXY[1].toFixed(1)})${unrot ? ` rotate(${unrot})` : ''}">
+  // The pin draws as a little flagstick (dark cup, pennant) so it can't be
+  // mistaken for a ball. Its POSITION is each round's true cup: a completed
+  // hole's final stroke ends in it, so the trail's holed-out endpoint is
+  // where the hole actually was that day (the courseData "marked position"
+  // is one static spot while the cup moves daily — fallback only). In the
+  // all-rounds overlay each day's flag wears its round's color. The glyph
+  // lives inside the rotated group, so it counter-rotates to stay upright.
+  const cupFlags = [];
+  trails.forEach(tr => {
+    const strokes = tr.h.strokes || [];
+    const last = strokes[strokes.length - 1];
+    const holed = last && !(((last.distanceRemaining || '') + '').trim());
+    const pt = tr.pts[tr.pts.length - 1];
+    if (holed && pt) cupFlags.push({ x: pt.x, y: pt.y, r: tr.r });
+  });
+  const unrot = landscape ? (flip ? 90 : -90) : (flip ? 180 : 0);
+  const flagAt = (x, y, cls, tip) =>
+    `<g class="hpin${cls}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})${unrot ? ` rotate(${unrot})` : ''}">
       <g class="flag"><line class="stick" x1="0" y1="0" x2="0" y2="-24"/>
       <path class="pennant" d="M0 -24 L15 -18.5 L0 -13 Z"/>
       <circle class="cup" r="4.5"/></g>
-      <title>Pin (marked position)</title></g>`;
+      <title>${tip}</title></g>`;
+  let marks = '';
+  if (cupFlags.length) {
+    marks = cupFlags.map(f => flagAt(f.x, f.y,
+      allMode ? ` hr ${ROUND_CLS[f.r] || 'r1'}` : '',
+      allMode ? `R${f.r} pin (holed-out position)` : 'Pin (holed-out position)')).join('');
+  } else if (pinXY) {
+    marks = flagAt(pinXY[0], pinXY[1], '', 'Pin (marked position — approximate)');
   }
   const wrapStyle = landscape
     ? `aspect-ratio:${t.fullH}/${t.fullW};width:980px`
@@ -511,7 +529,7 @@ function renderHole(cm) {
       <svg class="greenview" viewBox="${(gc[0] - half).toFixed(1)} ${(gc[1] - half).toFixed(1)} ${(2 * half).toFixed(1)} ${(2 * half).toFixed(1)}" role="img" aria-label="Green detail">
         <g${gT ? ` transform="${gT}"` : ''}>
           <image href="${esc(hm.imageUrl)}" x="0" y="0" width="1000" height="${vbH}" preserveAspectRatio="none"/>
-          ${marks}${gTrails}
+          ${gTrails}${marks}
         </g>
       </svg>
     </div>`;
@@ -597,7 +615,7 @@ function renderHole(cm) {
          <svg viewBox="0 0 ${boxW} ${boxH}" preserveAspectRatio="none" role="img" aria-label="Shot trails over the hole aerial">
            <g${gT ? ` transform="${gT}"` : ''}>
              <image href="${esc(hm.imageUrl)}" x="0" y="0" width="1000" height="${vbH}" preserveAspectRatio="none"/>
-             ${marks}<g class="adjlayer">${svgTrails}</g>
+             <g class="adjlayer">${svgTrails}</g>${marks}
            </g>
          </svg>
        </div>

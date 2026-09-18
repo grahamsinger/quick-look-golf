@@ -569,3 +569,13 @@ pennant. The glyph lives inside the rotated aerial group, so it
 counter-rotates by the same angle to keep flying upright in every
 orientation (landscape/portrait, flipped or not), and scales per context
 (1.9× on the full-hole aerial, 1:1 at putt scale on the green).
+
+Follow-up, after a sharp catch: the flag was planted at courseData's
+single "marked position" — but the cup moves every day. The flags now
+stand at each round's TRUE cup, recovered from the data itself: a
+completed hole's final stroke ends in the cup, so every trail's
+holed-out endpoint is that day's pin. All-rounds mode plants one flag
+per round, pennant in that round's color (matching the trail legend);
+single-round mode plants that day's red flag; the static marked
+position survives only as a fallback when nothing holed out. Flags draw
+above the trails, rising from the final ball in the cup.

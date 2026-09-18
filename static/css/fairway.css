@@ -384,6 +384,12 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 .hpin .stick { stroke: #FCF9F0; stroke-width: 2.4; stroke-linecap: round; }
 .hpin .pennant { fill: var(--flag); stroke: #FCF9F0; stroke-width: 1.3; stroke-linejoin: round; }
 .hpin .cup { fill: rgba(18,18,18,.85); stroke: #FCF9F0; stroke-width: 1.6; }
+/* all-rounds overlay: each day's flag flies its round's color */
+.hpin.hr { --rc: #F5F1E6; }
+.hpin.hr.r2 { --rc: #FFD34D; }
+.hpin.hr.r3 { --rc: #5BC0EB; }
+.hpin.hr.r4 { --rc: #F2709C; }
+.hpin.hr .pennant { fill: var(--rc); stroke: rgba(20,20,20,.55); }
 /* legend chips: swatch = round color; score keeps the app's result colors */
 .rleg { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
 .rlegchip { display: inline-flex; align-items: center; gap: 6px; }
