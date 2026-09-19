@@ -619,3 +619,17 @@ Fixes from a testing pass, plus a layout rethink:
   weren't searches) — it's a button that opens a panel with its own search
   box, like the field picker. Same list underneath: dates, LIVE badge,
   sticky to the current selection, arrows/Enter/Escape.
+- **Field becomes the home view** — first tab, and what a loaded week opens
+  on (a leaderboard is the natural landing; the per-player views are one
+  click away and deep links still restore whatever view they carry).
+- **Field grid polish, from a testing pass:**
+  - **The day's yardages** sit under the par row (from `/api/coursestats`,
+    per round — tees move between rounds, sometimes majorly); the row scrolls
+    away under the pinned par row rather than adding sticky chrome.
+  - **Single-tee days drop the start marks.** The corner wedge (and the
+    hint text about it) only appears when the round actually split tees —
+    a wedge on everyone's hole 1 said nothing.
+  - **Columns stay put when flipping rounds.** Hole cells hold a fixed
+    width and the name column stops sizing to its longest visible name
+    (round 1 has the whole field, round 4 only the cut survivors), so the
+    grid no longer shifts sideways between rounds.

@@ -47,7 +47,22 @@ default. Self-hosted Fraunces display serif.
 - **Flag it:** every page's topbar has a **Flag** button — jot what looks
   wrong and it's filed (with the page's deep link) to `data/issues.json`;
   the Cache admin page lists open flags with a resolve button.
-- **First putts** (default view):
+- **Field** view (default — the first thing a loaded week shows): the whole
+  field's round as the classic **race chart** — rows = players (ordered by
+  where they stood when the round ended), columns = holes; each cell is the
+  player's cumulative tournament score to par through that hole, colored by
+  what they scored on it (eagle+/birdie/bogey/double+), with par and **the
+  day's yardages** at the top (tees move between rounds, sometimes majorly),
+  Rd/Tot columns, and tie-aware positions. **Scores run in the order
+  actually played**: on split-tee days a 10-starter's total accumulates
+  10→18 then 1→9, their starting hole carries a small corner mark, and the
+  scorer's classic * sits by the name (single-tee days skip the marks;
+  pairings via `/api/teetimes`; pre-2013 events fall back to hole order).
+  Click a row to select that player everywhere; the ★ on a row (hover)
+  **pins a favorite to the top**, remembered across tournaments. During live
+  play, players yet to tee off hold their leaderboard spot with their tee
+  time.
+- **First putts**:
   - *Single round* — a **Front | Back scorecard** (both nines side by side, all
     18 holes at once): **Hole · Had · Proximity · Putts · Result**, where *Had* =
     distance to the pin before the approach, *Proximity* = how close the first
@@ -76,18 +91,6 @@ default. Self-hosted Fraunces display serif.
     **All Rounds** or any single round (per-round yardage shows moved-up
     tees). Click a row to zoom the hole; the hole zoom shows the same numbers
     for the open hole in a **field strip** that follows the round selection.
-- **Field** view: the whole field's round as the classic **race chart** —
-  rows = players (ordered by where they stood when the round ended), columns =
-  holes; each cell is the player's cumulative tournament score to par through
-  that hole, colored by what they scored on it (eagle+/birdie/bogey/double+),
-  with a par row, Rd/Tot columns, and tie-aware positions. **Scores run in
-  the order actually played**: on split-tee days a 10-starter's total
-  accumulates 10→18 then 1→9, their starting hole carries a small corner
-  mark, and the scorer's classic * sits by the name (pairings via
-  `/api/teetimes`; pre-2013 events fall back to hole order). Click a row to
-  select that player everywhere; the ★ on a row (hover) **pins a favorite
-  to the top**, remembered across tournaments. During live play, players
-  yet to tee off hold their leaderboard spot with their tee time.
 - **The record book** (`/records`, the "Records" link in the topbar):
   cross-tournament hole records over everything loaded — hardest and easiest
   holes by par, double+ and birdie-or-better rates, hardest single rounds —

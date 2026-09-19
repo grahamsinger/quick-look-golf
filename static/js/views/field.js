@@ -64,6 +64,21 @@ function getTees(tid) {
 // wrapping 1 onward (a PGA round is always a single loop of the course)
 const playOrder = st => Array.from({ length: 18 }, (_, i) => (((st || 1) - 1 + i) % 18) + 1);
 
+// course stats, for the day's yardages under the par row — tees move between
+// rounds (sometimes majorly), so the scorecard yardage alone can mislead
+const statsCache = new Map();  // tid -> {pending} | {res}
+function getStats(tid) {
+  const e = statsCache.get(tid);
+  if (e === undefined) {
+    statsCache.set(tid, { pending: true });
+    api(`/api/coursestats?tournamentId=${encodeURIComponent(tid)}`)
+      .then(res => { statsCache.set(tid, { res }); if (state.view === 'field') renderField(); })
+      .catch(() => statsCache.set(tid, { res: { available: false } }));
+  }
+  const cur = statsCache.get(tid);
+  return cur && cur.res && cur.res.available ? cur.res : null;
+}
+
 // favorite players: their rows pin to the top of the grid. Stored once for
 // the app (player ids are stable), so favorites follow you across weeks.
 const FAV_LS = 'fairway-fav-players';
@@ -147,6 +162,10 @@ export function renderField() {
 
   const tees = getTees(tid);
   const startOf = pid => (tees && tees[String(rnd)] && tees[String(rnd)][pid]) || 0;
+  // same-tee day (everyone off 1): the corner start marks would sit on every
+  // row's hole 1 and say nothing — only draw them when the tees are split
+  const splitTees = r => !!(tees && tees[String(r)] && Object.values(tees[String(r)]).some(v => v > 1));
+  const split = splitTees(rnd);
 
   // one row per player, ordered by current standing (running total for
   // players on the course, leaderboard total for those yet to start).
@@ -163,7 +182,7 @@ export function renderField() {
       if (!s) continue;
       const diff = s.s - s.par;
       run += diff;
-      byHole[h] = `<td class="fcell${cellCls(diff)}${st === h ? ' fc-first' : ''}">${fmtPar(run)}</td>`;
+      byHole[h] = `<td class="fcell${cellCls(diff)}${split && st === h ? ' fc-first' : ''}">${fmtPar(run)}</td>`;
     }
     let cells = '';
     for (let h = 1; h <= 18; h++) cells += byHole[h] || '<td class="fcell"></td>';
@@ -198,6 +217,23 @@ export function renderField() {
         <td class="frd">${Object.values(d.pars).reduce((a, b) => a + b, 0)}</td><td class="ftot"></td></tr>`
     : '';
 
+  // this round's yardages under par — only when the feed has all 18 holes
+  // for the day (a pre-2023 skeleton or an unposted round simply shows none)
+  let ydsRow = '';
+  if (parRow) {
+    const stats = getStats(tid);
+    const host = stats && ((stats.courses || []).find(c => c.hostCourse) || (stats.courses || [])[0]);
+    const blk = host && (host.rounds || []).find(b => b.label === `Round ${rnd}`);
+    const yds = {};
+    ((blk && blk.rows) || []).forEach(r => { if (r.hole >= 1 && r.hole <= 18 && r.yards) yds[r.hole] = r.yards; });
+    const tot = ((blk && blk.rows) || []).find(r => r.label === 'TOTAL');
+    if (Object.keys(yds).length === 18) {
+      ydsRow = `<tr class="fydsrow"><td class="fpos"></td><td class="fname">Yards</td>
+        ${Array.from({ length: 18 }, (_, i) => `<td class="fcell">${yds[i + 1]}</td>`).join('')}
+        <td class="frd">${tot && tot.yards ? tot.yards : ''}</td><td class="ftot"></td></tr>`;
+    }
+  }
+
   // inline scorecards for the expanded player: one sub-row per round —
   // raw hole scores colored by result, Rd = that round, Tot = through it.
   // Newest first. A mid-round card shows too, labeled "thru N" — raw
@@ -219,11 +255,12 @@ export function renderField() {
       const p = rd.available && rd.players.find(x => x.id === expandedPid);
       if (!p) continue;
       const st = (tees && tees[String(r)] && tees[String(r)][expandedPid]) || 0;
+      const rSplit = splitTees(r);
       const by = new Map(p.scores.map(s => [s.h, s]));
       let cells = '';
       for (let h = 1; h <= 18; h++) {
         const s = by.get(h);
-        cells += s ? `<td class="fcell${cellCls(s.s - s.par)}${st === h ? ' fc-first' : ''}">${s.s}</td>` : '<td class="fcell"></td>';
+        cells += s ? `<td class="fcell${cellCls(s.s - s.par)}${rSplit && st === h ? ' fc-first' : ''}">${s.s}</td>` : '<td class="fcell"></td>';
       }
       const strokes = p.total && p.total !== '-' ? p.total : '';
       const cum = p.start + p.diff;
@@ -265,12 +302,12 @@ export function renderField() {
     `<div class="summary"><span class="who">The field</span><span class="meta">Round <b>${rnd}</b> · hole-by-hole running score</span></div>
      <div class="caphint">Each cell = cumulative <b>tournament</b> score to par through that hole · color = the score on that hole
        (<span class="fkey fc-eag">eagle+</span> <span class="fkey fc-bir">birdie</span> <span class="fkey fc-bog">bogey</span> <span class="fkey fc-dbl">double+</span>)
-       · scores run in the order played: corner mark = the starting hole (<span class="ftee10">*</span> by a name = started on 10)
+       ${split ? '· scores run in the order played: corner mark = the starting hole (<span class="ftee10">*</span> by a name = started on 10)' : ''}
        · click a row to open that player's round-by-round scorecards (and select them) · ★ pins favorites to the top${waitHint}</div>
      <div class="card fieldcard"><div class="fieldwrap"><table class="fieldgrid">
        <thead><tr><th class="fpos"></th><th class="fname">Player</th>
          ${Array.from({ length: 18 }, (_, i) => `<th>${i + 1}</th>`).join('')}
-         <th class="frd">Rd</th><th class="ftot">Tot</th></tr>${parRow}</thead>
+         <th class="frd">Rd</th><th class="ftot">Tot</th></tr>${parRow}${ydsRow}</thead>
        <tbody>${body}</tbody>
      </table></div></div>`;
 
