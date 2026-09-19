@@ -139,7 +139,6 @@ input:focus, select:focus {
 #year { width: 78px; text-align: center; font-variant-numeric: tabular-nums; }
 .input-wrap { position: relative; display: flex; align-items: center; }
 .input-wrap .search-ic { position: absolute; left: 11px; color: var(--ink-3); pointer-events: none; }
-.input-wrap #tournInput { padding-left: 33px; min-width: 280px; max-width: 400px; width: 100%; }
 .select-wrap { position: relative; display: flex; align-items: center; }
 .select-wrap select { appearance: none; -webkit-appearance: none; padding-right: 32px; width: 100%; }
 .select-wrap .chev { position: absolute; right: 11px; color: var(--ink-3); pointer-events: none; }
@@ -147,11 +146,12 @@ input:focus, select:focus {
 .player-combo { position: relative; min-width: 235px; }
 .player-btn { max-width: 340px; }
 .player-btn #playerBtnLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.player-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+.player-panel, .tourn-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
   background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);
-  box-shadow: var(--shadow); padding: 10px; width: min(720px, calc(100vw - 48px)); }
+  box-shadow: var(--shadow); padding: 10px; }
+.player-panel { width: min(720px, calc(100vw - 48px)); }
 .pfilter-wrap { margin-bottom: 10px; }
-.pfilter-wrap #playerFilter { width: 100%; padding-left: 33px; height: 36px; }
+.pfilter-wrap input { width: 100%; padding-left: 33px; height: 36px; }
 /* two-column grid: a right-aligned position rail | the tie group's chips */
 .player-board { max-height: 380px; overflow-y: auto; display: grid;
   grid-template-columns: max-content 1fr; align-items: start; gap: 9px 12px; padding: 2px; }
@@ -201,8 +201,13 @@ input:focus, select:focus {
 .btn-primary:active { transform: translateY(1px); }
 .btn-primary:disabled { opacity: .5; cursor: default; }
 
-/* searchable tournament combobox */
+/* tournament picker: button trigger + panel with its own search box */
 .combo { position: relative; }
+.tourn-btn { min-width: 300px; max-width: 400px; }
+.tourn-btn #tournBtnLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tourn-panel { width: min(430px, calc(100vw - 48px)); }
+.tourn-panel .combo-list { position: static; border: 0; border-radius: 0; box-shadow: none;
+  padding: 0; width: 100%; min-width: 0; max-width: none; max-height: 320px; }
 .combo-list {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; margin: 0; padding: 5px; list-style: none;
   background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);

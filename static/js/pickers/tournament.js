@@ -1,4 +1,5 @@
-// Tournament typeahead combobox + season schedule loading.
+// Tournament picker: a button + dropdown panel with its own search box
+// (same pattern as the player picker — the trigger itself isn't typable).
 import { $, esc, status } from '../dom.js';
 import { state } from '../state.js';
 import { api } from '../api.js';
@@ -17,12 +18,13 @@ function currentTournLabel() {
   const t = state.tournaments.find(x => x.id === $('tourn').value);
   return t ? tournLabel(t) : '';
 }
+function syncTournBtn() { $('tournBtnLabel').textContent = currentTournLabel() || 'pick a season'; }
+
 function renderTournList(filter) {
   const q = (filter || '').trim().toLowerCase();
   tournFiltered = state.tournaments.filter(t => !q || tournLabel(t).toLowerCase().includes(q));
   const selId = $('tourn').value;
-  const list = $('tournList');
-  list.innerHTML = tournFiltered.length
+  $('tournList').innerHTML = tournFiltered.length
     ? tournFiltered.map(t => {
         const live = t.tournamentStatus === 'IN_PROGRESS';
         const cls = [t.id === selId ? 'sel' : '', live ? 'live' : ''].filter(Boolean).join(' ');
@@ -30,13 +32,6 @@ function renderTournList(filter) {
         return `<li role="option" data-id="${t.id}" class="${cls}"><span class="tlabel">${esc(tournLabel(t))}</span>${badge}</li>`;
       }).join('')
     : '<li class="combo-empty">No matches</li>';
-  list.hidden = false;
-  $('tournInput').setAttribute('aria-expanded', 'true');
-  tournActive = -1;
-}
-function closeTournList() {
-  $('tournList').hidden = true;
-  $('tournInput').setAttribute('aria-expanded', 'false');
   tournActive = -1;
 }
 function setActiveTourn(i, block = 'nearest') {
@@ -52,6 +47,19 @@ function highlightSelectedTourn() {
   const idx = tournFiltered.findIndex(t => t.id === $('tourn').value);
   if (idx >= 0) setActiveTourn(idx, 'center');
 }
+function openTournPanel() {
+  $('tournFilter').value = '';
+  renderTournList('');
+  $('tournPanel').hidden = false;
+  $('tournBtn').setAttribute('aria-expanded', 'true');
+  highlightSelectedTourn();
+  $('tournFilter').focus();
+}
+function closeTournPanel() {
+  $('tournPanel').hidden = true;
+  $('tournBtn').setAttribute('aria-expanded', 'false');
+  tournActive = -1;
+}
 export function selectTourn(id, opts = {}) {
   const t = state.tournaments.find(x => x.id === id);
   if (!t) return;
@@ -59,27 +67,25 @@ export function selectTourn(id, opts = {}) {
   // when the select is still empty and a deep link may have set the hole)
   if ($('tourn').value && $('tourn').value !== id) state.courseHole = null;
   $('tourn').value = id;
-  $('tournInput').value = tournLabel(t);
-  closeTournList();
+  syncTournBtn();
+  closeTournPanel();
   if (opts.load !== false) loadPlayers();
 }
 export function setupTournCombo() {
-  const tin = $('tournInput');
-  tin.addEventListener('focus', () => { tin.select(); renderTournList(''); highlightSelectedTourn(); });
-  tin.addEventListener('input', () => { renderTournList(tin.value); if (tournFiltered.length) setActiveTourn(0); });
-  tin.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); if ($('tournList').hidden) renderTournList(tin.value); setActiveTourn(tournActive + 1); }
+  $('tournBtn').addEventListener('click', () => { $('tournPanel').hidden ? openTournPanel() : closeTournPanel(); });
+  const fin = $('tournFilter');
+  fin.addEventListener('input', () => { renderTournList(fin.value); if (tournFiltered.length) setActiveTourn(0); });
+  fin.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveTourn(tournActive + 1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveTourn(tournActive - 1); }
-    else if (e.key === 'Enter') { e.preventDefault(); const t = tournFiltered[tournActive]; if (t) selectTourn(t.id); }
-    else if (e.key === 'Escape') { closeTournList(); tin.value = currentTournLabel(); tin.blur(); }
+    else if (e.key === 'Enter') { e.preventDefault(); const t = tournFiltered[tournActive] || tournFiltered[0]; if (t) selectTourn(t.id); }
+    else if (e.key === 'Escape') { closeTournPanel(); $('tournBtn').focus(); }
   });
-  tin.addEventListener('blur', () => { setTimeout(() => { closeTournList(); tin.value = currentTournLabel(); }, 150); });
-  $('tournList').addEventListener('mousedown', (e) => {
+  $('tournList').addEventListener('click', (e) => {
     const li = e.target.closest('li[role=option]');
-    if (!li) return;
-    e.preventDefault();  // keep focus, beat the blur
-    selectTourn(li.dataset.id);
+    if (li) selectTourn(li.dataset.id);
   });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.field.combo')) closeTournPanel(); });
 }
 
 export async function loadTournaments(preferredId) {

@@ -614,3 +614,8 @@ Fixes from a testing pass, plus a layout rethink:
   the page's deep-link URL (the records page attaches its mode/filters too).
   The admin page lists open flags with an "open that page" link and a resolve
   button — so glitches get captured in the moment instead of retyped later.
+- **Tournament picker matches the player picker.** The trigger is no longer
+  a typable input (clicking it selected the text and invited edits that
+  weren't searches) — it's a button that opens a panel with its own search
+  box, like the field picker. Same list underneath: dates, LIVE badge,
+  sticky to the current selection, arrows/Enter/Escape.

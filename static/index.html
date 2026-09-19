@@ -58,15 +58,19 @@
       </div>
     </div>
     <div class="field combo">
-      <label for="tournInput">Tournament</label>
-      <div class="input-wrap">
-        <svg class="ic search-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4"/><path d="M10 10 13.6 13.6"/></svg>
-        <input type="hidden" id="tourn" />
-        <input type="text" id="tournInput" autocomplete="off" spellcheck="false"
-               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="tournList"
-               placeholder="Search tournaments…" />
+      <label for="tournBtn">Tournament</label>
+      <input type="hidden" id="tourn" />
+      <button type="button" id="tournBtn" class="round-btn tourn-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="tournPanel">
+        <span id="tournBtnLabel">pick a season</span>
+        <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+      </button>
+      <div id="tournPanel" class="tourn-panel" hidden>
+        <div class="input-wrap pfilter-wrap">
+          <svg class="ic search-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4"/><path d="M10 10 13.6 13.6"/></svg>
+          <input type="text" id="tournFilter" autocomplete="off" spellcheck="false" placeholder="Search tournaments…" />
+        </div>
+        <ul id="tournList" class="combo-list" role="listbox"></ul>
       </div>
-      <ul id="tournList" class="combo-list" role="listbox" hidden></ul>
     </div>
     <button id="go" class="btn-primary">
       <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11"/><path d="M9 3.5 13.5 8 9 12.5"/></svg>

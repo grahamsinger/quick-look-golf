@@ -35,8 +35,9 @@ sun/moon toggle (top right) that remembers your choice and follows the system
 default. Self-hosted Fraunces display serif.
 
 - **Controls, on two levels:** the toolbar picks the week — season, a
-  **searchable tournament combobox** (dates + a "LIVE" badge on the
-  in-progress event; opens *sticky to the current selection*), and **Load**.
+  **tournament picker** (a dropdown with its own search box inside — dates +
+  a "LIVE" badge on the in-progress event; opens *sticky to the current
+  selection*), and **Load**.
   The browse row under it holds what reloads in place: the view tabs, a
   **leaderboard player picker** (the dropdown is a mini leaderboard: a
   position rail with one badge per tie group, player chips with colored
