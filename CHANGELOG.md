@@ -624,8 +624,10 @@ Fixes from a testing pass, plus a layout rethink:
   click away and deep links still restore whatever view they carry).
 - **Field grid polish, from a testing pass:**
   - **The day's yardages** sit under the par row (from `/api/coursestats`,
-    per round — tees move between rounds, sometimes majorly); the row scrolls
-    away under the pinned par row rather than adding sticky chrome.
+    per round — tees move between rounds, sometimes majorly). The row pins
+    with the header and par rows, the whole band floating together (a first
+    cut let it scroll away, but its left-stuck YARDS label hung orphaned
+    over the header while the numbers vanished).
   - **Single-tee days drop the start marks.** The corner wedge (and the
     hint text about it) only appears when the round actually split tees —
     a wedge on everyone's hole 1 said nothing.
