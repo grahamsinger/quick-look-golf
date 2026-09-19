@@ -649,3 +649,9 @@ Fixes from a testing pass, plus a layout rethink:
     request per round, once per session), so even the *first* flip to a
     round renders in the same tick as the click. Expanding a player's
     round-by-round scorecards rides the same warm cache.
+- **Difficulty shading in the course stats table.** Each hole row wears a
+  wash scaled by its distance from par — red over, green under, near-even
+  stays neutral — so stretches of brutal or gettable holes read as bands
+  instead of a column of decimals. Intensity tops out at the familiar
+  birdie/bogey-cell tint (±0.45 to par ≈ full strength), from the same
+  theme tokens, so it reads in dark mode too.

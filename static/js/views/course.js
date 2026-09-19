@@ -256,6 +256,17 @@ function courseStatsCard(payload, zoomable = true) {
   const pills = cs.rounds.map(b =>
     `<button type="button" class="spill${b === blk ? ' on' : ''}" data-pill="${esc(b.label)}">${esc(b.label)}${b.live ? '<i class="lived"></i>' : ''}</button>`).join('');
   const num = v => v == null ? '' : v;
+  // difficulty wash: each hole row tinted by how far it plays from par —
+  // red over, green under, intensity ∝ |diff| — so stretches of hard or
+  // gettable holes read as bands. Scaled from the same theme tint tokens
+  // the score cells use (±0.45 to par ≈ a full birdie/bogey-cell tint);
+  // near-even holes stay neutral, the diverging midpoint.
+  const shadeFor = (diff) => {
+    const dv = parseFloat(diff);
+    if (!Number.isFinite(dv) || Math.abs(dv) < 0.02) return '';
+    const p = Math.round(Math.min(Math.abs(dv) / 0.45, 1) * 100);
+    return ` style="background:color-mix(in srgb, var(--tint-${dv > 0 ? 'bad' : 'good'}-2) ${p}%, transparent)"`;
+  };
   const rows = (blk.rows || []).map(r => {
     const mid = `<td class="num">${num(r.par)}</td><td class="num">${num(r.yards)}</td>` +
       `<td class="num avgc">${esc(r.avg || '')}</td><td class="num ${diffCls(r.tendency)}">${fmtDiff(r.diff)}</td>`;
@@ -263,7 +274,7 @@ function courseStatsCard(payload, zoomable = true) {
       `<td class="num">${num(r.pars)}</td><td class="num">${num(r.bogeys)}</td><td class="num">${num(r.doubles)}</td>` +
       `<td class="num">${r.others == null ? '–' : r.others}</td>`;
     return r.hole != null
-      ? `<tr${zoomable ? ` data-hole="${r.hole}"` : ''}><td class="hole">${r.hole}</td>${mid}<td class="num">${num(r.rank)}</td>${counts}</tr>`
+      ? `<tr${zoomable ? ` data-hole="${r.hole}"` : ''}${shadeFor(r.diff)}><td class="hole">${r.hole}</td>${mid}<td class="num">${num(r.rank)}</td>${counts}</tr>`
       : `<tr class="sumrow"><td class="hole">${esc(r.label || '')}</td>${mid}<td></td>${counts}</tr>`;
   }).join('');
   return `<div class="card statscard">
@@ -275,7 +286,7 @@ function courseStatsCard(payload, zoomable = true) {
         <th title="Eagles">E</th><th title="Birdies">B</th><th title="Pars">P</th><th title="Bogeys">Bo</th><th title="Double bogeys">D</th><th title="Triple bogey or worse (derived — blank while a round is live)">T+</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="caphint statshint">How the field played each hole · rank <b>1</b> = hardest · E/B/P/Bo/D = eagles → double bogeys · <b>T+</b> = triples or worse ("others", derived from the field count)${zoomable ? ' · click a hole to zoom' : ''}</div>
+    <div class="caphint statshint">How the field played each hole · rank <b>1</b> = hardest · row shading = distance from par (<b class="rg-bad">over</b> / <b class="rg-good">under</b>) · E/B/P/Bo/D = eagles → double bogeys · <b>T+</b> = triples or worse ("others", derived from the field count)${zoomable ? ' · click a hole to zoom' : ''}</div>
   </div>`;
 }
 
