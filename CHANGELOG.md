@@ -637,7 +637,9 @@ Fixes from a testing pass, plus a layout rethink:
     grid no longer shifts sideways between rounds. A second pass pinned
     the stragglers: the position rail ("T101" is wider than "T9"), Rd
     (just "−2" mid-round, "71 −2" after) and Tot — every column is now
-    measured-identical across rounds.
+    measured-identical across rounds. Inside Rd, the to-par half sits in
+    its own fixed-width box, so a "61 −10" doesn't push its strokes out
+    of line with the "63 −8" below it.
   - **Round flips stop flickering.** Switching rounds in the Field view
     went through the foreground loader, which blanked the page and
     fetched the *selected player's* shots — data the grid doesn't show —

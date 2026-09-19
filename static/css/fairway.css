@@ -481,6 +481,9 @@ table.fieldgrid thead .fpos, table.fieldgrid thead .fname { z-index: 4; }
    card's right edge on every round flip */
 table.fieldgrid .frd { text-align: right; color: var(--ink-2); padding-left: 14px;
   box-sizing: border-box; min-width: 68px; }
+/* the to-par half sits in a fixed-width box: "−10" is wider than "−8", and
+   letting it size to content wobbled the stroke totals to its left */
+table.fieldgrid .frd b { display: inline-block; min-width: 3.4ch; text-align: right; }
 table.fieldgrid .frd b.rg-good { color: var(--good); } table.fieldgrid .frd b.rg-bad { color: var(--bad); }
 table.fieldgrid .ftot { text-align: right; box-sizing: border-box; min-width: 42px; }
 table.fieldgrid .ftot b.rg-good { color: var(--good); } table.fieldgrid .ftot b.rg-bad { color: var(--bad); }
