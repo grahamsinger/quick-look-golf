@@ -597,23 +597,12 @@ function renderHole(cm) {
 
   // shot-by-shot verbiage under the aerial (the feed's own play-by-play);
   // drops/penalties appear as unnumbered muted lines, like the Tour's panel
-  // hole-by-hole strip: every hole as a jumpable chip carrying the player's
-  // result there — single round shows the score, all-rounds the net to par
+  // hole-by-hole strip: every hole as a jumpable numbered chip
   const stripNums = new Set();
   rounds.forEach(r => ((roundsData[r] || {}).holes || []).forEach(h => { if (h.holeNumber >= 1) stripNums.add(h.holeNumber); }));
-  const holeStrip = stripNums.size ? `<div class="holestrip">${[...stripNums].sort((a, b) => a - b).map(n => {
-    const played = rounds
-      .map(r => ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === n))
-      .filter(h => h && h.score != null && h.par != null);
-    let lbl = '·', cls = '';
-    if (played.length) {
-      const d = played.reduce((s, h) => s + (h.score - h.par), 0);
-      lbl = allMode ? (d === 0 ? 'E' : d > 0 ? `+${d}` : `−${-d}`) : String(played[0].score);
-      cls = d < 0 ? ' hs-good' : d > 0 ? ' hs-bad' : '';
-    }
-    return `<button type="button" class="hchip${n === holeNum ? ' cur' : ''}${cls}" data-hgo="${n}" aria-label="Jump to hole ${n}">
-      <span class="hcn">${n}</span><span class="hcs">${lbl}</span></button>`;
-  }).join('')}</div>` : '';
+  const holeStrip = stripNums.size ? `<div class="holestrip">${[...stripNums].sort((a, b) => a - b).map(n =>
+    `<button type="button" class="hchip${n === holeNum ? ' cur' : ''}" data-hgo="${n}" aria-label="Jump to hole ${n}">${n}</button>`
+  ).join('')}</div>` : '';
 
   const pbp = trails.length ? `<div class="pbp">${rounds.map(r => {
     const h = ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === holeNum);
