@@ -391,6 +391,7 @@ table.putts tbody tr.threeputt { background: var(--tint-bad); }
 /* legend chips: swatch = round color; score keeps the app's result colors */
 .rleg { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
 .rlegchip { display: inline-flex; align-items: center; gap: 6px; }
+.rlegchip.rlegoff { opacity: .6; font-style: italic; }
 .sw { width: 14px; height: 4px; border-radius: 2px; background: #F5F1E6; box-shadow: 0 0 0 1px rgba(20,20,20,.35); }
 .sw.r2 { background: #FFD34D; }
 .sw.r3 { background: #5BC0EB; }

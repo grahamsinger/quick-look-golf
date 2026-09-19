@@ -44,7 +44,7 @@ function calibratedOffset(cm, holesList) {
     const fin = (h.strokes || []).filter(s => (s.strokeType || 'STROKE') === 'STROKE'
       && !((s.distanceRemaining || '') + '').trim());
     const c = fin.length && ((fin[fin.length - 1].overview || {}).leftToRightCoords || {}).toCoords;
-    if (!c || c.tourcastX == null) return;
+    if (!realXY(c)) return;
     xs.push(0.3048 * c.tourcastX - pt[0]);
     ys.push(0.3048 * c.tourcastY - pt[1]);
   });
@@ -74,13 +74,13 @@ function holeCorrection(cm, off, holeNum, roundsData, rounds) {
     if (!h) return;
     const strokes = (h.strokes || []).filter(s => (s.strokeType || 'STROKE') === 'STROKE');
     const fc = strokes.length && ((strokes[0].overview || {}).leftToRightCoords || {}).fromCoords;
-    if (fc && fc.tourcastX != null) {
+    if (realXY(fc)) {
       dTee.x.push(0.3048 * fc.tourcastX - off.x - pt[2]);
       dTee.y.push(0.3048 * fc.tourcastY - off.y - pt[3]);
     }
     const fin = strokes.filter(s => !((s.distanceRemaining || '') + '').trim());
     const c = fin.length && ((fin[fin.length - 1].overview || {}).leftToRightCoords || {}).toCoords;
-    if (c && c.tourcastX != null) {
+    if (realXY(c)) {
       dPin.x.push(0.3048 * c.tourcastX - off.x - pt[0]);
       dPin.y.push(0.3048 * c.tourcastY - off.y - pt[1]);
     }
@@ -193,6 +193,11 @@ function getAllRoundShots(tid, pid) {
 
 // --- shared trail building -------------------------------------------------
 
+// Untracked strokes carry sentinel coords (0/0 or -1/-1) instead of null —
+// multi-course weeks only run TOURCAST on the host course, so a whole round
+// can be sentinels. Real tourcast values live in the thousands.
+const realXY = c => c && c.tourcastX != null && !(c.tourcastX <= 0 && c.tourcastY <= 0);
+
 // One hole's strokes -> ordered points (tee, then each shot's finish).
 function holePoints(h, toPt, tipPrefix = '') {
   const pts = [];
@@ -202,7 +207,7 @@ function holePoints(h, toPt, tipPrefix = '') {
     // (the trail really moved) but say so instead of faking a shot number
     const isDrop = (s.strokeType || 'STROKE') !== 'STROKE';
     const add = (c, isFrom) => {
-      if (!c || c.tourcastX == null) return;
+      if (!realXY(c)) return;
       const [x, y] = toPt(c.tourcastX, c.tourcastY);
       if (isFrom && pts.length) return;
       const holed = !((s.distanceRemaining || '') + '').trim();
@@ -427,13 +432,14 @@ function renderHole(cm) {
     return holeWorldToPx(hm, wx, wy);
   };
   const trails = [];
+  const untracked = [];  // rounds that were played but carry no plottable coords
   let par = null;
   rounds.forEach(r => {
     const h = ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === holeNum);
     if (!h) return;
     if (h.par != null) par = h.par;
     const pts = holePoints(h, toPt, allMode ? `R${r} ` : '');
-    if (pts.length < 2) return;
+    if (pts.length < 2) { if ((h.strokes || []).length) untracked.push({ r, h }); return; }
     trails.push({ r, h, pts });
   });
 
@@ -479,7 +485,10 @@ function renderHole(cm) {
   trails.forEach(tr => {
     const strokes = tr.h.strokes || [];
     const last = strokes[strokes.length - 1];
-    const holed = last && !(((last.distanceRemaining || '') + '').trim());
+    // the flag only means "cup" when the LAST stroke both holed out and was
+    // tracked — otherwise pts ends at an earlier stroke and would lie
+    const lc = last && ((last.overview || {}).leftToRightCoords || {}).toCoords;
+    const holed = last && !(((last.distanceRemaining || '') + '').trim()) && realXY(lc);
     const pt = tr.pts[tr.pts.length - 1];
     if (holed && pt) cupFlags.push({ x: pt.x, y: pt.y, r: tr.r });
   });
@@ -511,20 +520,33 @@ function renderHole(cm) {
     const [gpx, gpy] = holeWorldToPx(hm, pt2[0], pt2[1]);
     const upm = 1000 / (t.fullW * Math.hypot(t.a, t.d));  // viewBox units per meter
     const half = 24 * upm;  // 48 m window around the marked pin
-    // the window is a square in the *displayed* space — map the pin's
-    // portrait position through the same rotation the big aerial uses
-    const gc = !landscape ? (flip ? [1000 - gpx, vbH - gpy] : [gpx, gpy])
-      : (flip ? [gpy, 1000 - gpx] : [vbH - gpy, gpx]);
+    // the window is a square in the *displayed* space — map positions
+    // through the same rotation the big aerial uses
+    const mapDisp = (x, y) => !landscape ? (flip ? [1000 - x, vbH - y] : [x, y])
+      : (flip ? [y, 1000 - x] : [vbH - y, x]);
+    const gc = mapDisp(gpx, gpy);
+    // the marked pin centers the window, but the TRUE cups (the flags) can
+    // sit well away from it — grow the crop until every flag fits, then
+    // re-square so the aerial keeps its aspect
+    let x0 = gc[0] - half, y0 = gc[1] - half, x1 = gc[0] + half, y1 = gc[1] + half;
+    const pad = 8 * upm;  // breathing room for the pennant glyph
+    cupFlags.forEach(f => {
+      const [dx, dy] = mapDisp(f.x, f.y);
+      x0 = Math.min(x0, dx - pad); y0 = Math.min(y0, dy - pad);
+      x1 = Math.max(x1, dx + pad); y1 = Math.max(y1, dy + pad);
+    });
+    const side = Math.max(x1 - x0, y1 - y0);
+    const gvx = (x0 + x1 - side) / 2, gvy = (y0 + y1 - side) / 2;
     const gTrails = trails.map(tr => {
       const nGreen = (tr.h.strokes || []).filter(s =>
         (s.fromLocation || '').toLowerCase() === 'green'
-        && ((((s.overview || {}).leftToRightCoords || {}).toCoords) || {}).tourcastX != null).length;
+        && realXY((((s.overview || {}).leftToRightCoords || {}).toCoords) || null)).length;
       const pts = tr.pts.slice(-(nGreen + 1));  // setup shot's finish + every putt
       return pts.length ? `<g class="chole${allMode ? ` hr ${ROUND_CLS[tr.r] || 'r1'}` : ''}">${trailSvg(pts, 5)}</g>` : '';
     }).join('');
     greenCard = `<div class="greencard">
       <div class="gvhdr">On the green</div>
-      <svg class="greenview" viewBox="${(gc[0] - half).toFixed(1)} ${(gc[1] - half).toFixed(1)} ${(2 * half).toFixed(1)} ${(2 * half).toFixed(1)}" role="img" aria-label="Green detail">
+      <svg class="greenview" viewBox="${gvx.toFixed(1)} ${gvy.toFixed(1)} ${side.toFixed(1)} ${side.toFixed(1)}" role="img" aria-label="Green detail">
         <g${gT ? ` transform="${gT}"` : ''}>
           <image href="${esc(hm.imageUrl)}" x="0" y="0" width="1000" height="${vbH}" preserveAspectRatio="none"/>
           ${gTrails}${marks}
@@ -541,13 +563,16 @@ function renderHole(cm) {
   };
   const legend = allMode
     ? `<div class="rleg">${trails.map(tr =>
-        `<span class="rlegchip"><i class="sw ${ROUND_CLS[tr.r] || 'r1'}"></i>R${tr.r}${scoreBit(tr.h)}</span>`).join('')}</div>`
+        `<span class="rlegchip"><i class="sw ${ROUND_CLS[tr.r] || 'r1'}"></i>R${tr.r}${scoreBit(tr.h)}</span>`).join('')}${untracked.map(u =>
+        `<span class="rlegchip rlegoff" title="This round was played on a course TOURCAST didn't track">R${u.r}${scoreBit(u.h)} · no tracking</span>`).join('')}</div>`
     : '';
   const roundMeta = allMode
     ? `all rounds`
     : `Round <b>${rounds[0] || ''}</b>${trails[0] ? scoreBit(trails[0].h) : ''}`;
   const noData = trails.length ? '' :
-    '<div class="summary"><span class="meta">No shot trail for this hole in the selected round.</span></div>';
+    untracked.length
+      ? '<div class="summary"><span class="meta">Shots weren’t tracked for this round — multi-course weeks usually run TOURCAST only on the host course.</span></div>'
+      : '<div class="summary"><span class="meta">No shot trail for this hole in the selected round.</span></div>';
 
   // how the field played this hole, from the block matching the trails
   // (all-rounds overlay -> "All Rounds", single round -> that round's block)
