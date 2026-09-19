@@ -4,7 +4,8 @@
 // and per-player availability), so a missed cut simply shows fewer segments.
 import { $ } from '../dom.js';
 import { state, maxRound } from '../state.js';
-import { loadShots } from '../api.js';
+import { loadShots, syncUrl } from '../api.js';
+import { renderView } from '../views/render.js';
 
 // Rounds the *selected player* actually has data for — their leaderboard
 // strokes list ("-" until played), plus their in-progress round (mid-round
@@ -67,6 +68,16 @@ function selectRound(v) {
   if (v === $('round').value) return;
   $('round').value = v;
   renderRoundSeg();
+  // Field: the grid renders from its own cache — repaint it immediately and
+  // fetch the selected player's round in the background. Going through a
+  // foreground loadShots blanked the grid while it fetched per-player data
+  // the view doesn't even show (a visible flicker on every round flip).
+  if (state.view === 'field') {
+    renderView();
+    syncUrl();
+    loadShots({ background: true });
+    return;
+  }
   loadShots();
 }
 

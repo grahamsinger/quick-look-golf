@@ -632,4 +632,13 @@ Fixes from a testing pass, plus a layout rethink:
   - **Columns stay put when flipping rounds.** Hole cells hold a fixed
     width and the name column stops sizing to its longest visible name
     (round 1 has the whole field, round 4 only the cut survivors), so the
-    grid no longer shifts sideways between rounds.
+    grid no longer shifts sideways between rounds. A second pass pinned
+    the stragglers: the position rail ("T101" is wider than "T9"), Rd
+    (just "−2" mid-round, "71 −2" after) and Tot — every column is now
+    measured-identical across rounds.
+  - **Round flips stop flickering.** Switching rounds in the Field view
+    went through the foreground loader, which blanked the page and
+    fetched the *selected player's* shots — data the grid doesn't show —
+    before repainting. The grid now repaints instantly from its own
+    cache and the player fetch happens in the background. (No framework
+    needed — it was a render-discipline bug, not a missing library.)
