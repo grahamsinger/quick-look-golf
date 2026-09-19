@@ -644,3 +644,8 @@ Fixes from a testing pass, plus a layout rethink:
     before repainting. The grid now repaints instantly from its own
     cache and the player fetch happens in the background. (No framework
     needed — it was a render-discipline bug, not a missing library.)
+  - **The other rounds prefetch** as soon as one is on screen (completed
+    rounds are immutable and usually already server-cached — one cheap
+    request per round, once per session), so even the *first* flip to a
+    round renders in the same tick as the click. Expanding a player's
+    round-by-round scorecards rides the same warm cache.

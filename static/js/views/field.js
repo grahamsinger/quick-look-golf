@@ -64,6 +64,25 @@ function getTees(tid) {
 // wrapping 1 onward (a PGA round is always a single loop of the course)
 const playOrder = st => Array.from({ length: 18 }, (_, i) => (((st || 1) - 1 + i) % 18) + 1);
 
+// Once one round is on screen, quietly warm the tournament's other rounds so
+// flipping the seg never blanks to a spinner (completed rounds are immutable
+// and usually already sit in the server cache — this is one cheap request
+// per round, once per session). No re-render on arrival unless the user has
+// already flipped to that round and is sitting on the spinner.
+function prefetchRounds(tid, cur) {
+  for (let r = 1; r <= maxRound(); r++) {
+    if (r === cur || fieldCache.has(`${tid}:${r}`)) continue;
+    fieldCache.set(`${tid}:${r}`, { pending: true });
+    api(`/api/holebyhole?tournamentId=${encodeURIComponent(tid)}&round=${r}`)
+      .then(res => {
+        const live = !res.available || (res.players || []).some(p => p.scores.length < 18);
+        fieldCache.set(`${tid}:${r}`, { res, ts: Date.now(), live });
+        if (state.view === 'field' && Number($('round').value) === r) renderField();
+      })
+      .catch(() => fieldCache.delete(`${tid}:${r}`));  // a later look retries
+  }
+}
+
 // course stats, for the day's yardages under the par row — tees move between
 // rounds (sometimes majorly), so the scorecard yardage alone can mislead
 const statsCache = new Map();  // tid -> {pending} | {res}
@@ -330,4 +349,6 @@ export function renderField() {
     renderField();  // instant: the expansion opens from cache, spinners cover the rest
     if (known) loadShots({ background: true });  // player data for the other views
   });
+
+  prefetchRounds(tid, rnd);  // warm the other rounds — seg flips stay instant
 }
