@@ -1248,6 +1248,70 @@ def records_rebuild(year: int | None = None) -> dict:
     return _records_rebuild(year)
 
 
+# --- flagged issues ----------------------------------------------------------
+# The little "flag" button in every page's topbar files a note here, with the
+# page URL attached, so glitches get captured in the moment instead of retyped
+# later. Stored as plain JSON in data/issues.json — user-authored data, NOT a
+# cache: it survives cache wipes and is meant to be read back in a work
+# session (or from the admin page, which lists open flags with a resolve
+# button).
+_ISSUES_PATH = _DB_PATH.parent / "issues.json"
+_issues_lock = threading.Lock()
+
+
+def _issues_read() -> list[dict]:
+    try:
+        items = json.loads(_ISSUES_PATH.read_text())
+        return items if isinstance(items, list) else []
+    except Exception:
+        return []
+
+
+def _issues_write(items: list[dict]) -> None:
+    tmp = _ISSUES_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(items, indent=1))
+    tmp.replace(_ISSUES_PATH)
+
+
+@app.get("/api/issues")
+def issues_list() -> dict:
+    items = _issues_read()
+    items.sort(key=lambda x: str(x.get("ts", "")), reverse=True)
+    return {"issues": items, "open": sum(1 for x in items if x.get("status") == "open")}
+
+
+@app.post("/api/issues")
+def issues_add(payload: dict) -> dict:
+    note = str(payload.get("note") or "").strip()[:2000]
+    if not note:
+        raise HTTPException(status_code=400, detail="note is required")
+    entry = {
+        "id": os.urandom(4).hex(),
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "note": note,
+        "url": str(payload.get("url") or "").strip()[:500],
+        "ctx": str(payload.get("ctx") or "").strip()[:300],
+        "status": "open",
+    }
+    with _issues_lock:
+        items = _issues_read()
+        items.append(entry)
+        _issues_write(items)
+    return entry
+
+
+@app.post("/api/issues/{issue_id}/resolve")
+def issues_resolve(issue_id: str) -> dict:
+    with _issues_lock:
+        items = _issues_read()
+        hit = next((x for x in items if x.get("id") == issue_id), None)
+        if hit is None:
+            raise HTTPException(status_code=404, detail="no such flag")
+        hit["status"] = "done"
+        _issues_write(items)
+    return hit
+
+
 # leaderboard credibility floors: rates need a real field behind them —
 # player-rounds for a week (a 30-man TOUR Championship week is ~120), a
 # single round's field for the per-round list (Hero's 20 stays out)

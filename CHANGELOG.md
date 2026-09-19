@@ -583,3 +583,33 @@ above the trails, rising from the final ball in the cup.
 (One more pass: the flagstick came off — the marker is now just the dark
 cup with the round-colored triangle rising directly from it. Less ink,
 same meaning.)
+
+## Sep 2026 — untracked rounds, honest windows, and a browse row
+
+Fixes from a testing pass, plus a layout rethink:
+
+- **Untracked rounds stop plotting garbage.** Multi-course weeks (the RSM
+  Classic) only run TOURCAST on the host course; the other course's strokes
+  arrive with sentinel coords (0/0, -1/-1) that drew phantom trails and even
+  a phantom cup flag. A shared `realXY()` guard filters sentinels everywhere
+  coordinates are read — trails, calibration anchors, hole correction, cup
+  flags — and the round shows in the hole legend as "no tracking" instead of
+  silently disappearing.
+- **The green window chases every cup.** The "On the green" crop was a fixed
+  48 m square on the *marked* pin; a day's true cup cut far from it (K.H. Lee,
+  Byron Nelson '22 h9 R4) fell outside the crop and its flag vanished. The
+  window now grows to cover every cup flag, then re-squares.
+- **Player + round moved down to the browse row.** Season + Tournament + Load
+  keep the toolbar (pick-then-Load); the controls that reload in place —
+  player and round — now sit beside the view tabs. The round dropdown became
+  a **segmented R1…R4 · All control**; per-view and per-player availability
+  still just changes which segments appear.
+- **Hole-by-hole strip** in the hole zoom: 18 chips under the bar showing the
+  player's result (score in a single round, net-to-par across all rounds),
+  each a jump straight to that hole. The orientation/hover hint lines moved
+  below the aerials; only the adjust-mode instructions stay on top.
+- **Flag it for review.** Every page's topbar has a "Flag" button — jot what
+  looks wrong and it's filed to `data/issues.json` (via `/api/issues`) with
+  the page's deep-link URL (the records page attaches its mode/filters too).
+  The admin page lists open flags with an "open that page" link and a resolve
+  button — so glitches get captured in the moment instead of retyped later.

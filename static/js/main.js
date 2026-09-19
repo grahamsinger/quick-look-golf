@@ -1,4 +1,5 @@
 // Entry point: global event wiring + boot (restore deep link, auto-load).
+import './flag.js';  // topbar "Flag" button (self-wiring)
 import { $ } from './dom.js';
 import { state, maxRound } from './state.js';
 import { initTheme } from './theme.js';

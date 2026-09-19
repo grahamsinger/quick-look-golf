@@ -93,6 +93,27 @@ b, strong { font-weight: 640; }
   border: 1px solid transparent; color: var(--ink-2); cursor: pointer; padding: 7px; border-radius: var(--r-sm); margin-right: 4px; }
 .topnav-btn:hover { background: var(--paper-2); color: var(--ink); }
 .topnav-btn .ic { width: 16px; height: 16px; }
+/* flag-a-problem: topbar button + popover (built by js/flag.js on any page) */
+.flagwrap { position: relative; display: inline-flex; }
+.flagwrap > button { display: inline-flex; align-items: center; gap: 5px; background: transparent; border: none;
+  color: var(--ink-2); font-size: 12.5px; font-weight: 550; padding: 6px 10px; border-radius: var(--r-sm); cursor: pointer; }
+.flagwrap > button:hover { background: var(--paper-2); color: var(--flag); }
+.flagwrap > button .ic { color: var(--ink-3); width: 15px; height: 15px; }
+.flagwrap > button:hover .ic { color: var(--flag); }
+.flagpop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 300px;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r);
+  box-shadow: var(--shadow); padding: 12px; display: flex; flex-direction: column; gap: 9px; text-align: left; }
+.flagpop[hidden] { display: none; }
+.flagpop .flaghdr { font-weight: 700; font-size: 13px; color: var(--ink); }
+.flagpop textarea { resize: vertical; min-height: 64px; background: var(--card-2); color: var(--ink);
+  border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 8px 10px; font-size: 13px; font-family: inherit; }
+.flagpop textarea:focus { outline: none; border-color: var(--pine); box-shadow: 0 0 0 3px var(--focus-ring); }
+.flagrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.flagctx { color: var(--ink-3); font-size: 11px; }
+#flagSend { background: var(--pine); color: #F4EFE2; border: 1px solid var(--pine); border-radius: var(--r-sm);
+  padding: 6px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+#flagSend:hover { background: var(--pine-2); }
+#flagSend:disabled { opacity: .65; cursor: default; }
 
 /* ---------- toolbar ---------- */
 .toolbar {

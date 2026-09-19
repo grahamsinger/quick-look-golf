@@ -43,6 +43,12 @@ Ideas discussed but not built, and things to verify. Shipped work is in
   as a 3-round event, and 54-hole weather weeks are handled (round 1's
   `currentRound` caps the walk). Presidents Cup years will hit the
   match-play gap too.
+- **Per-round course awareness in the Course view** — untracked rounds on
+  multi-course weeks now show "no tracking" (sentinel 0/0 · -1/-1 coords are
+  filtered app-wide). But if a secondary course ever IS tracked (Pebble's
+  rota weeks?), those shots would project onto the host aerial and land
+  wrong. Real fix: detect each round's courseId (teeTimesV2 groups carry it)
+  and load that course's own aerial for that round's trails.
 - **Course view ideas** (overview + per-hole zoom shipped — see CHANGELOG;
   projection recipes documented there and in `static/js/views/course.js` /
   `/api/coursemap` / `/api/holemap`):

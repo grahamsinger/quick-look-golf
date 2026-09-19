@@ -34,14 +34,18 @@ step** — with a light **editorial "Fairway" theme** and a **dark mode** —
 sun/moon toggle (top right) that remembers your choice and follows the system
 default. Self-hosted Fraunces display serif.
 
-- **Controls:** season, a **searchable tournament combobox** (dates + a "LIVE"
-  badge on the in-progress event; opens *sticky to the current selection*), a
-  **leaderboard player picker** (the dropdown is a mini leaderboard: a position
-  rail with one badge per tie group, player chips with colored scores, a
-  search-the-field typeahead, and a dimmed missed-cut section; defaults to the
-  leader), and round — **‹ ›** arrows step through a tournament's days, or pick
-  **All rounds** (the default). Rounds a player didn't play fall back to their
-  latest round with data.
+- **Controls, on two levels:** the toolbar picks the week — season, a
+  **searchable tournament combobox** (dates + a "LIVE" badge on the
+  in-progress event; opens *sticky to the current selection*), and **Load**.
+  The browse row under it holds what reloads in place: the view tabs, a
+  **leaderboard player picker** (the dropdown is a mini leaderboard: a
+  position rail with one badge per tie group, player chips with colored
+  scores, a search-the-field typeahead, and a dimmed missed-cut section;
+  defaults to the leader), and a **segmented round control** (R1…R4 · All;
+  segments a player didn't play simply don't appear).
+- **Flag it:** every page's topbar has a **Flag** button — jot what looks
+  wrong and it's filed (with the page's deep link) to `data/issues.json`;
+  the Cache admin page lists open flags with a resolve button.
 - **First putts** (default view):
   - *Single round* — a **Front | Back scorecard** (both nines side by side, all
     18 holes at once): **Hole · Had · Proximity · Putts · Result**, where *Had* =
