@@ -331,11 +331,11 @@ function renderFullCourse(cm) {
   };
 
   const mapBlock = mapOpen()
-    ? `<div class="caphint">Trails run tee → hole · click a hole to zoom in · hover a dot for the shot · hole chip = score (<b class="rg-good">under</b> / par / <b class="rg-bad">over</b>) · aerial: PGA TOUR TOURCAST</div>
-       <div class="card coursemap"><div class="cmwrap">
+    ? `<div class="card coursemap"><div class="cmwrap">
          <img src="${esc(cm.imageUrl)}" alt="Course aerial" draggable="false" />
          <svg viewBox="0 0 2048 2048" role="img" aria-label="Shot trails over the course aerial">${groups.map(trail).join('')}</svg>
-       </div></div>`
+       </div></div>
+       <div class="caphint capfoot">Trails run tee → hole · click a hole to zoom in · hover a dot for the shot · hole chip = score (<b class="rg-good">under</b> / par / <b class="rg-bad">over</b>) · aerial: PGA TOUR TOURCAST</div>`
     : '';
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Round <b>${d.round}</b> · every shot on the course</span></div>
@@ -597,6 +597,24 @@ function renderHole(cm) {
 
   // shot-by-shot verbiage under the aerial (the feed's own play-by-play);
   // drops/penalties appear as unnumbered muted lines, like the Tour's panel
+  // hole-by-hole strip: every hole as a jumpable chip carrying the player's
+  // result there — single round shows the score, all-rounds the net to par
+  const stripNums = new Set();
+  rounds.forEach(r => ((roundsData[r] || {}).holes || []).forEach(h => { if (h.holeNumber >= 1) stripNums.add(h.holeNumber); }));
+  const holeStrip = stripNums.size ? `<div class="holestrip">${[...stripNums].sort((a, b) => a - b).map(n => {
+    const played = rounds
+      .map(r => ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === n))
+      .filter(h => h && h.score != null && h.par != null);
+    let lbl = '·', cls = '';
+    if (played.length) {
+      const d = played.reduce((s, h) => s + (h.score - h.par), 0);
+      lbl = allMode ? (d === 0 ? 'E' : d > 0 ? `+${d}` : `−${-d}`) : String(played[0].score);
+      cls = d < 0 ? ' hs-good' : d > 0 ? ' hs-bad' : '';
+    }
+    return `<button type="button" class="hchip${n === holeNum ? ' cur' : ''}${cls}" data-hgo="${n}" aria-label="Jump to hole ${n}">
+      <span class="hcn">${n}</span><span class="hcs">${lbl}</span></button>`;
+  }).join('')}</div>` : '';
+
   const pbp = trails.length ? `<div class="pbp">${rounds.map(r => {
     const h = ((roundsData[r] || {}).holes || []).find(x => x.holeNumber === holeNum);
     if (!h || !(h.strokes || []).length) return '';
@@ -616,9 +634,7 @@ function renderHole(cm) {
 
   $('out').innerHTML =
     `<div class="summary"><span class="who">${esc(playerName())}</span><span class="meta">Hole <b>${holeNum}</b>${par != null ? ` · par ${par}` : ''} · ${roundMeta}</span></div>
-     <div class="caphint">${adjustMode
-       ? '<b>Adjust:</b> drag the aerial to slide this hole’s trails into place · saved for this hole on this device · <b>done</b> finishes'
-       : `${orient} · hover a dot for the shot${allMode ? ' · hover a trail to isolate that round' : ''}${manual ? ' · manually adjusted' : ''} · aerial: PGA TOUR TOURCAST`}</div>
+     ${adjustMode ? '<div class="caphint"><b>Adjust:</b> drag the aerial to slide this hole’s trails into place · saved for this hole on this device · <b>done</b> finishes</div>' : ''}
      <div class="card coursemap holemap">
        <div class="holebar">
          <button type="button" class="hback">‹ Full course</button>
@@ -633,6 +649,7 @@ function renderHole(cm) {
            ${manual && !adjustMode ? '<button type="button" class="hadjreset" title="Remove the saved adjustment">reset</button>' : ''}
          </span>
        </div>
+       ${holeStrip}
        ${hfield}${noData}
        <div class="cmwrap cmwrap-hole" style="${wrapStyle}">
          <svg viewBox="0 0 ${boxW} ${boxH}" preserveAspectRatio="none" role="img" aria-label="Shot trails over the hole aerial">
@@ -643,9 +660,11 @@ function renderHole(cm) {
          </svg>
        </div>
        <div class="holeside">${greenCard}${pbp}</div>
-     </div>`;
+     </div>
+     ${adjustMode ? '' : `<div class="caphint capfoot">${orient} · hover a dot for the shot${allMode ? ' · hover a trail to isolate that round' : ''}${manual ? ' · manually adjusted' : ''} · aerial: PGA TOUR TOURCAST</div>`}`;
   $('out').querySelector('.hback').addEventListener('click', zoomOut);
   $('out').querySelectorAll('.hstep').forEach(b => b.addEventListener('click', () => stepHole(Number(b.dataset.hstep))));
+  $('out').querySelectorAll('[data-hgo]').forEach(b => b.addEventListener('click', () => zoomToHole(Number(b.dataset.hgo))));
   $('out').querySelector('.hadj').addEventListener('click', () => { adjustMode = !adjustMode; renderCourse(); });
   const resetBtn = $('out').querySelector('.hadjreset');
   if (resetBtn) resetBtn.addEventListener('click', () => { delete adjMap[adjKey]; saveAdj(adjMap); renderCourse(); });
