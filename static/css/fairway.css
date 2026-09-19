@@ -168,12 +168,6 @@ input:focus, select:focus {
 .round-btn .chev { color: var(--ink-3); flex: none; }
 .round-menu { min-width: 100%; }
 .round-menu li.sel:not(.active) { color: var(--pine); font-weight: 640; }
-.round-nav { display: flex; align-items: center; gap: 6px; }
-.rnav { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 40px;
-  background: var(--card-2); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; padding: 0; }
-.rnav:hover:not(:disabled) { background: var(--card); color: var(--pine); border-color: var(--pine); }
-.rnav:disabled { opacity: .38; cursor: default; }
-.rnav .ic { width: 15px; height: 15px; }
 
 .btn-primary {
   display: inline-flex; align-items: center; gap: 7px; justify-content: center;
@@ -216,8 +210,12 @@ input:focus, select:focus {
 #status.err { color: var(--flag); }
 #status .asof { margin: 0; }
 
-/* view toggle */
+/* view toggle + browse controls (player & round live here: changing them
+   loads in place, unlike the toolbar's pick-then-Load tournament switch) */
 .viewbar { display: flex; align-items: center; gap: 18px; padding: 12px 24px 0; flex-wrap: wrap; }
+.browse { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.browse .player-btn { height: 38px; }
+.roundseg .segbtn { padding: 7px 12px; }
 .seg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 3px; gap: 2px; }
 .segbtn {
   display: inline-flex; align-items: center; gap: 7px; background: transparent; color: var(--ink-2);

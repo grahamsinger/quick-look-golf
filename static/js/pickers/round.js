@@ -1,37 +1,16 @@
-// Round picker: ‹ › stepping + a custom styled dropdown over a hidden <select>.
+// Round picker: a segmented control (R1…R4 · All) rendered from the hidden
+// <select id="round">, which stays the single source of truth for the rest
+// of the app. Buttons are rebuilt whenever the option list changes (per-view
+// and per-player availability), so a missed cut simply shows fewer segments.
 import { $ } from '../dom.js';
 import { state, maxRound } from '../state.js';
 import { loadShots } from '../api.js';
 
-// The arrows walk the picker's own option order — R1 → … → Rmax → All
-// rounds (when the view offers it) — so "All rounds" is one more › past
-// the last round, not an unreachable dead end.
-const roundOrder = () => [...$('round').options].map(o => o.value);
-
-export function updateRoundNav() {
-  const order = roundOrder();
-  const i = order.indexOf($('round').value);
-  const prev = document.querySelector('.rnav[data-step="-1"]');
-  const next = document.querySelector('.rnav[data-step="1"]');
-  if (prev) prev.disabled = i <= 0;
-  if (next) next.disabled = i < 0 || i >= order.length - 1;
-}
-
-export function stepRound(step) {
-  const order = roundOrder();
-  const target = order[order.indexOf($('round').value) + step];
-  if (!target) return;
-  $('round').value = target;
-  syncRoundBtn();
-  updateRoundNav();
-  loadShots();
-}
-
 // Rounds the *selected player* actually has data for — their leaderboard
 // strokes list ("-" until played), plus their in-progress round (mid-round
 // the strokes cell is still "-" but shot data exists). A missed cut means
-// fewer rounds than the tournament, and stepping › must not dead-end on a
-// round the player never played (it made "All rounds" unreachable).
+// fewer rounds than the tournament, and the seg must not offer a round the
+// player never played.
 function playerMaxRound(mx) {
   const p = (state.players || []).find(x => x.id === $('player').value);
   if (!p || !Array.isArray(p.rounds)) return mx;
@@ -60,63 +39,41 @@ export function updateRoundOptions() {
   sel.value = [...sel.options].some(o => o.value === cur) ? cur
     : /^\d+$/.test(cur) ? String(mx)
     : (allowAll ? 'all' : String(mx));
-  syncRoundBtn();
-  updateRoundNav();
+  renderRoundSeg();
 }
 
-// --- custom round dropdown (styled menu over the hidden <select>) ----------
-const roundLabel = (v) => { const o = [...$('round').options].find(x => x.value === v); return o ? o.textContent : v; };
+function renderRoundSeg() {
+  const seg = $('roundSeg');
+  if (!seg) return;
+  const sel = $('round');
+  seg.querySelectorAll('.segbtn').forEach(b => b.remove());
+  [...sel.options].forEach(o => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'segbtn' + (o.value === sel.value ? ' active' : '');
+    b.dataset.rval = o.value;
+    b.textContent = o.value === 'all' ? 'All' : `R${o.value}`;
+    b.title = o.textContent;
+    seg.appendChild(b);
+  });
+}
 
-export function syncRoundBtn() { $('roundBtnLabel').textContent = roundLabel($('round').value); }
+// kept under their historical names — several callers re-sync the control
+// after changing the hidden <select> directly
+export function syncRoundBtn() { renderRoundSeg(); }
+export function updateRoundNav() { renderRoundSeg(); }
 
-function renderRoundMenu() {
-  const sel = $('round').value;
-  $('roundMenu').innerHTML = [...$('round').options].map(o =>
-    `<li role="option" data-val="${o.value}" class="${o.value === sel ? 'sel' : ''}" aria-selected="${o.value === sel}">${o.textContent}</li>`).join('');
-}
-function closeRoundMenu() { $('roundMenu').hidden = true; $('roundBtn').setAttribute('aria-expanded', 'false'); roundActive = -1; }
-function openRoundMenu() {
-  renderRoundMenu(); $('roundMenu').hidden = false; $('roundBtn').setAttribute('aria-expanded', 'true');
-  roundActive = -1;
-  const idx = [...$('round').options].findIndex(o => o.value === $('round').value);
-  if (idx >= 0) setActiveRound(idx);
-}
-let roundActive = -1;
-function setActiveRound(i) {
-  const items = [...$('roundMenu').querySelectorAll('li[role=option]')];
-  if (!items.length) return;
-  roundActive = Math.max(0, Math.min(i, items.length - 1));
-  items.forEach((el, idx) => el.classList.toggle('active', idx === roundActive));
-  items[roundActive].scrollIntoView({ block: 'nearest' });
-}
 function selectRound(v) {
-  closeRoundMenu();
   if (v === $('round').value) return;
   $('round').value = v;
-  syncRoundBtn();
-  updateRoundNav();
+  renderRoundSeg();
   loadShots();
 }
 
 export function setupRoundCombo() {
-  $('roundBtn').addEventListener('click', () => { $('roundMenu').hidden ? openRoundMenu() : closeRoundMenu(); });
-  $('roundMenu').addEventListener('click', (e) => { const li = e.target.closest('li[role=option]'); if (li) selectRound(li.dataset.val); });
-  $('roundMenu').addEventListener('mousemove', (e) => {
-    const li = e.target.closest('li[role=option]');
-    if (li) setActiveRound([...$('roundMenu').querySelectorAll('li[role=option]')].indexOf(li));
+  $('roundSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('.segbtn[data-rval]');
+    if (b) selectRound(b.dataset.rval);
   });
-  $('roundBtn').addEventListener('keydown', (e) => {
-    const open = !$('roundMenu').hidden;
-    if (e.key === 'Escape') { closeRoundMenu(); return; }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (!open) openRoundMenu();
-      else setActiveRound(roundActive + (e.key === 'ArrowDown' ? 1 : -1));
-    } else if ((e.key === 'Enter' || e.key === ' ') && open) {
-      e.preventDefault();  // keep the button's click-toggle from also firing
-      const li = $('roundMenu').querySelectorAll('li[role=option]')[roundActive];
-      if (li) selectRound(li.dataset.val);
-    }
-  });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.round-combo')) closeRoundMenu(); });
+  renderRoundSeg();
 }

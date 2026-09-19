@@ -68,46 +68,6 @@
       </div>
       <ul id="tournList" class="combo-list" role="listbox" hidden></ul>
     </div>
-    <div class="field field-player">
-      <label for="playerBtn">Player</label>
-      <div class="player-combo">
-        <select id="player" hidden><option value="">pick a tournament</option></select>
-        <button type="button" id="playerBtn" class="round-btn player-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="playerPanel">
-          <span id="playerBtnLabel">pick a tournament</span>
-          <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
-        </button>
-        <div id="playerPanel" class="player-panel" hidden>
-          <div class="input-wrap pfilter-wrap">
-            <svg class="ic search-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4"/><path d="M10 10 13.6 13.6"/></svg>
-            <input type="text" id="playerFilter" autocomplete="off" spellcheck="false" placeholder="Search the field…" />
-          </div>
-          <div id="playerBoard" class="player-board" role="listbox"></div>
-        </div>
-      </div>
-    </div>
-    <div class="field field-round">
-      <label for="round">Round</label>
-      <div class="round-nav">
-        <button class="rnav" data-step="-1" type="button" aria-label="Previous round" title="Previous round">
-          <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8 10 12.5"/></svg>
-        </button>
-        <div class="round-combo">
-          <select id="round" hidden>
-            <option value="1">Round 1</option><option value="2">Round 2</option>
-            <option value="3">Round 3</option><option value="4">Round 4</option>
-            <option value="all" selected>All rounds</option>
-          </select>
-          <button type="button" id="roundBtn" class="round-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="roundMenu">
-            <span id="roundBtnLabel">All rounds</span>
-            <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
-          </button>
-          <ul id="roundMenu" class="combo-list round-menu" role="listbox" hidden></ul>
-        </div>
-        <button class="rnav" data-step="1" type="button" aria-label="Next round" title="Next round">
-          <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
-        </button>
-      </div>
-    </div>
     <button id="go" class="btn-primary">
       <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11"/><path d="M9 3.5 13.5 8 9 12.5"/></svg>
       Load
@@ -132,6 +92,29 @@
         <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12"/><path d="M2 9.5h12"/><path d="M6 2.5v11"/></svg>
         Field
       </button>
+    </div>
+    <div class="browse">
+      <div class="player-combo">
+        <select id="player" hidden><option value="">pick a tournament</option></select>
+        <button type="button" id="playerBtn" class="round-btn player-btn" aria-label="Player" aria-haspopup="listbox" aria-expanded="false" aria-controls="playerPanel">
+          <span id="playerBtnLabel">pick a tournament</span>
+          <svg class="ic chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+        </button>
+        <div id="playerPanel" class="player-panel" hidden>
+          <div class="input-wrap pfilter-wrap">
+            <svg class="ic search-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4"/><path d="M10 10 13.6 13.6"/></svg>
+            <input type="text" id="playerFilter" autocomplete="off" spellcheck="false" placeholder="Search the field…" />
+          </div>
+          <div id="playerBoard" class="player-board" role="listbox"></div>
+        </div>
+      </div>
+      <div class="seg roundseg" id="roundSeg" role="group" aria-label="Round">
+        <select id="round" hidden>
+          <option value="1">Round 1</option><option value="2">Round 2</option>
+          <option value="3">Round 3</option><option value="4">Round 4</option>
+          <option value="all" selected>All rounds</option>
+        </select>
+      </div>
     </div>
     <div id="status"></div>
   </div>

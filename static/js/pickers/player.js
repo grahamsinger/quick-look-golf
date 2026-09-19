@@ -144,5 +144,5 @@ export function setupPlayerCombo() {
     else if (e.key === 'Enter') { e.preventDefault(); const items = visibleChips(); const c = items[playerActive] || items[0]; if (c) choosePlayer(c.dataset.id); }
     else if (e.key === 'Escape') { closePlayerPanel(); $('playerBtn').focus(); }
   });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.field-player')) closePlayerPanel(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.player-combo')) closePlayerPanel(); });
 }

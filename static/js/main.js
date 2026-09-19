@@ -5,7 +5,7 @@ import { initTheme } from './theme.js';
 import { loadShots, copyLink, syncUrl } from './api.js';
 import { setupTournCombo, loadTournaments } from './pickers/tournament.js';
 import { setupYearCombo, syncYearBtn } from './pickers/year.js';
-import { setupRoundCombo, stepRound, updateRoundNav, updateRoundOptions, syncRoundBtn } from './pickers/round.js';
+import { setupRoundCombo, updateRoundOptions, syncRoundBtn } from './pickers/round.js';
 import { setupPlayerCombo, selectPlayer } from './pickers/player.js';
 import { renderView } from './views/render.js';
 
@@ -37,8 +37,6 @@ document.querySelectorAll('.segbtn').forEach(btn => btn.addEventListener('click'
 }));
 
 $('go').addEventListener('click', () => loadShots());
-document.querySelectorAll('.rnav').forEach(b => b.addEventListener('click', () => stepRound(Number(b.dataset.step))));
-$('round').addEventListener('change', updateRoundNav);
 document.addEventListener('click', (e) => {
   const copyBtn = e.target.closest('.copylink-btn');
   if (copyBtn) { copyLink(copyBtn); return; }
