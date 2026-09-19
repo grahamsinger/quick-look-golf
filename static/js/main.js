@@ -53,8 +53,9 @@ async function init() {
   setupPlayerCombo();
   const q = new URLSearchParams(location.search);
   const wantT = q.get('t'), wantP = q.get('p'), wantR = q.get('r'), wantV = q.get('v'), wantH = q.get('h');
+  // Field is the default view; older links carry v explicitly
   if (wantV === 'shots' || wantV === 'trails') setActiveView('shots');
-  else if (wantV === 'field') setActiveView('field');
+  else if (wantV === 'putts') setActiveView('putts');
   else if (wantV === 'course') {
     setActiveView('course');
     const h = Number(wantH);
