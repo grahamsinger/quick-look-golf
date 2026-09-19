@@ -604,10 +604,11 @@ Fixes from a testing pass, plus a layout rethink:
   player and round — now sit beside the view tabs. The round dropdown became
   a **segmented R1…R4 · All control**; per-view and per-player availability
   still just changes which segments appear.
-- **Hole-by-hole strip** in the hole zoom: 18 chips under the bar showing the
-  player's result (score in a single round, net-to-par across all rounds),
-  each a jump straight to that hole. The orientation/hover hint lines moved
-  below the aerials; only the adjust-mode instructions stay on top.
+- **Hole-by-hole strip** in the hole zoom: 18 numbered chips under the bar,
+  each a jump straight to that hole (a first cut carried per-hole scores,
+  but that doubled the legend and read like a scorecard — navigation only).
+  The orientation/hover hint lines moved below the aerials; only the
+  adjust-mode instructions stay on top.
 - **Flag it for review.** Every page's topbar has a "Flag" button — jot what
   looks wrong and it's filed to `data/issues.json` (via `/api/issues`) with
   the page's deep-link URL (the records page attaches its mode/filters too).
